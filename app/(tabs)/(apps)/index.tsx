@@ -25,13 +25,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ACCENT_COLORS, useAppTheme } from '../../../theme/app-preferences';
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Apps' },
-  { id: 'sideloading', label: 'Sideloading' },
-  { id: 'games', label: 'Games' },
-  { id: 'social', label: 'Social' },
-  { id: 'emu', label: 'EMU' },
-  { id: 'movies', label: 'Movies' },
-  { id: 'tools', label: 'Tools' },
+  { id: 'all', label: '全部应用' },
+  { id: 'sideloading', label: '侧载应用' },
+  { id: 'games', label: '游戏' },
+  { id: 'social', label: '社交' },
+  { id: 'emu', label: '模拟器' },
+  { id: 'movies', label: '影视' },
+  { id: 'tools', label: '工具' },
 ];
 
 const APP_CARD_ROW_HEIGHT = APP_CARD_HEIGHT + 14;
@@ -246,7 +246,7 @@ export default function HomeScreen() {
     [appIndexByBundle, router]
   );
 
-  const currentCategoryLabel = CATEGORIES.find(c => c.id === selectedCategory)?.label || 'All Apps';
+  const currentCategoryLabel = CATEGORIES.find(c => c.id === selectedCategory)?.label || '全部应用';
 
   const categoryTabs = useMemo(() => (
     <View>
@@ -260,7 +260,7 @@ export default function HomeScreen() {
         selectable
         style={[styles.categoryCount, { color: theme.secondaryLabel }]}
       >
-        {filteredApps.length} {filteredApps.length === 1 ? 'app' : 'apps'}
+        {filteredApps.length} 个应用
       </Text>
     </View>
   ), [accentColor, filteredApps.length, handleCategorySelect, selectedCategory, theme.secondaryLabel]);
@@ -305,7 +305,7 @@ export default function HomeScreen() {
             : 'There are currently no applications hosted under this category.'}
         </Text>
         <TouchableOpacity onPress={() => handleCategorySelect('all')} style={styles.showAllBtn} activeOpacity={0.8}>
-          <Text style={styles.showAllBtnText}>Show All Apps ({repo?.apps?.length || 0})</Text>
+          <Text style={styles.showAllBtnText}>显示全部应用 ({repo?.apps?.length || 0})</Text>
         </TouchableOpacity>
       </View>
     );
