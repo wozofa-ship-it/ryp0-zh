@@ -21,13 +21,13 @@ import { SymbolView } from 'expo-symbols';
 import { ACCENT_COLORS, useAppTheme } from '../../../theme/app-preferences';
 
 const CATEGORIES = [
-  { id: 'all', label: 'All Apps' },
-  { id: 'sideloading', label: 'Sideloading' },
-  { id: 'games', label: 'Games' },
-  { id: 'social', label: 'Social' },
-  { id: 'emu', label: 'EMU' },
-  { id: 'movies', label: 'Movies' },
-  { id: 'tools', label: 'Tools' },
+  { id: 'all', label: '全部应用' },
+  { id: 'sideloading', label: '侧载应用' },
+  { id: 'games', label: '游戏' },
+  { id: 'social', label: '社交' },
+  { id: 'emu', label: '模拟器' },
+  { id: 'movies', label: '影视' },
+  { id: 'tools', label: '工具' },
 ];
 
 const APP_CARD_ROW_HEIGHT = APP_CARD_HEIGHT + 14;
