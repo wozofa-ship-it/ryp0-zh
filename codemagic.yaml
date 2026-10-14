@@ -1,0 +1,29 @@
+workflows:
+  ios-unsigned-workflow:
+    name: iOS unsigned IPA
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      node: 20
+      xcode: latest
+      vars:
+        XCODE_PROJECT: ios/ryP0.xcworkspace
+        XCODE_SCHEME: ryP0
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install
+      - name: Expo prebuild
+        script: |
+          npx expo prebuild --platform ios --clean
+      - name: Build unsigned IPA
+        script: |
+          set -e
+          mkdir -p build
+          xcodebuild archive -workspace "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -configuration Release -destination 'generic/platform=iOS' -archivePath "$CM_BUILD_DIR/build/ryP0.xcarchive" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          APP_PATH=$(find "$CM_BUILD_DIR/build/ryP0.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -n 1)
+          mkdir -p "$CM_BUILD_DIR/build/Payload"
+          cp -R "$APP_PATH" "$CM_BUILD_DIR/build/Payload/"
+          cd "$CM_BUILD_DIR/build" && zip -qry ryP0-zh-unsigned.ipa Payload
+    artifacts:
+      - build/ryP0-zh-unsigned.ipa
