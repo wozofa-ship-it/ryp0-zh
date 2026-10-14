@@ -276,7 +276,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
           >
             <LabeledContent label="应用类型">
               <Text modifiers={[font({ weight: 'semibold' }), foregroundStyle(SECONDARY)]}>
-                {getAppUpdatePolicy(app) === 'daily' ? 'Daily Update' : 'Static'}
+                {getAppUpdatePolicy(app) === 'daily' ? '每日更新' : '静态'}
               </Text>
             </LabeledContent>
             <LabeledContent label="状态">
