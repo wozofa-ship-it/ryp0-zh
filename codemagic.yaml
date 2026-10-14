@@ -7,8 +7,8 @@ workflows:
       node: 20
       xcode: latest
       vars:
-        XCODE_PROJECT: ios/ryP0.xcworkspace
-        XCODE_SCHEME: ryP0
+        XCODE_PROJECT: ios/ryP0Admin.xcodeproj
+        XCODE_SCHEME: ryP0Admin
     scripts:
       - name: Install dependencies
         script: |
@@ -19,17 +19,17 @@ workflows:
           npx expo prebuild --platform ios --clean --no-install
           echo "=== 检查生成的 iOS 工程 ==="
           ls -la ios/ | head -20
-          if [ ! -d "ios/ryP0.xcworkspace" ]; then
-            echo "ERROR: ios/ryP0.xcworkspace 不存在，实际内容："
+          if [ ! -d "ios/ryP0Admin.xcodeproj" ]; then
+            echo "ERROR: ios/ryP0Admin.xcodeproj 不存在，实际内容："
             find ios -maxdepth 2 -name "*.xcworkspace" -o -maxdepth 2 -name "*.xcodeproj" | head -10
             exit 1
           fi
-          echo "✓ xcworkspace 已生成"
+          echo "✓ xcodeproj 已生成"
       - name: Build unsigned IPA
         script: |
           set -e
           mkdir -p build
-          xcodebuild archive -workspace "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -configuration Release -destination 'generic/platform=iOS' -archivePath "$CM_BUILD_DIR/build/ryP0.xcarchive" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+          xcodebuild archive -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -configuration Release -destination 'generic/platform=iOS' -archivePath "$CM_BUILD_DIR/build/ryP0.xcarchive" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
           APP_PATH=$(find "$CM_BUILD_DIR/build/ryP0.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -n 1)
           mkdir -p "$CM_BUILD_DIR/build/Payload"
           cp -R "$APP_PATH" "$CM_BUILD_DIR/build/Payload/"
