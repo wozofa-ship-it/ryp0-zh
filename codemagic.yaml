@@ -16,7 +16,7 @@ workflows:
       - name: Expo prebuild
         script: |
           set -e
-          npx expo prebuild --platform ios --clean --no-install
+          npx expo prebuild --platform ios --clean
           echo "=== 检查生成的 iOS 工程 ==="
           ls -la ios/ | head -20
           if [ ! -d "ios/ryP0Admin.xcodeproj" ]; then
