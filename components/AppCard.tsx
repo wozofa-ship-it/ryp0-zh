@@ -47,7 +47,7 @@ function AppCardComponent({ app, drag, isActive, onOpen, onEdit, onDelete, onDup
   const subtitle = app.subtitle || app.localizedDescription || `${app.name} for iOS`;
   const theme = getAppCardTheme(app, index);
   const appStatus = getAppStatus(app, runtimeStatus ?? app.status);
-  const typeLabel = getAppUpdatePolicy(app) === 'daily' ? 'Daily Update' : 'Static';
+  const typeLabel = getAppUpdatePolicy(app) === 'daily' ? '每日更新' : '静态';
   const cardWidth = Math.max(1, viewportWidth - 32);
 
   const openVersion = useCallback(async (version: RepoVersion) => {
