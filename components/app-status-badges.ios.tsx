@@ -9,7 +9,7 @@ import type { RepoApp } from '../types/repo';
 export default function AppStatusBadges({ app }: { app: RepoApp }) {
   const runtimeStatus = useRepoStore((state) => state.runtimeAppStatuses[getAppStatusKey(app)]);
   const status = getAppStatus(app, runtimeStatus ?? app.status);
-  const typeLabel = getAppUpdatePolicy(app) === 'daily' ? 'Daily Update' : 'Static';
+  const typeLabel = getAppUpdatePolicy(app) === 'daily' ? '每日更新' : '静态';
   const statusDescription = `${status.label}: ${status.message || status.detail}`;
   return (
     <Host style={{ width: '100%', height: 22 }} ignoreSafeArea="all">
