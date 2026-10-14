@@ -9,7 +9,7 @@ export default function AppStatusBadges({ app }: { app: RepoApp }) {
   const status = getAppStatus(app, runtimeStatus ?? app.status);
   return (
     <View style={{ flexDirection: 'row', gap: 6, height: 24, alignItems: 'center' }}>
-      <Text style={{ color: '#FFFFFF', backgroundColor: '#25252D', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>{getAppUpdatePolicy(app) === 'daily' ? 'Daily Update' : 'Static'}</Text>
+      <Text style={{ color: '#FFFFFF', backgroundColor: '#25252D', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>{getAppUpdatePolicy(app) === 'daily' ? '每日更新' : '静态'}</Text>
       <Text accessibilityLabel={`${status.label}: ${status.message || status.detail}`} style={{ color: status.color, backgroundColor: '#FFFFFF', fontSize: 11, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 }}>{status.label}</Text>
     </View>
   );
