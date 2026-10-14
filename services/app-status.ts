@@ -72,26 +72,26 @@ export function getAppStatus(
   const state: RepoAppStatus['state'] = isCurrent && isKnownState ? persistedState : 'unknown';
   const presentations = {
     healthy: {
-      label: 'Healthy',
-      detail: 'The latest IPA is available',
+      label: '正常',
+      detail: '最新 IPA 可用',
       color: '#248A3D',
       symbol: 'checkmark.circle.fill',
     },
     broken: {
-      label: 'Broken',
-      detail: 'The latest IPA download is unavailable',
+      label: '已失效',
+      detail: '最新 IPA 下载不可用',
       color: '#FF3B30',
       symbol: 'xmark.circle.fill',
     },
     'update-error': {
-      label: 'Update Error',
-      detail: 'The latest automatic update failed',
+      label: '更新失败',
+      detail: '最新自动更新失败',
       color: '#FF9500',
       symbol: 'exclamationmark.triangle.fill',
     },
     unknown: {
-      label: 'Unknown',
-      detail: 'The latest IPA has not been verified recently',
+      label: '未知',
+      detail: '最新 IPA 最近未验证',
       color: '#8E8E93',
       symbol: 'questionmark.circle',
     },
