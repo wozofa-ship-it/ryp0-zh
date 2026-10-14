@@ -15,7 +15,16 @@ workflows:
           npm install
       - name: Expo prebuild
         script: |
-          npx expo prebuild --platform ios --clean
+          set -e
+          npx expo prebuild --platform ios --clean --no-install
+          echo "=== 检查生成的 iOS 工程 ==="
+          ls -la ios/ | head -20
+          if [ ! -d "ios/ryP0.xcworkspace" ]; then
+            echo "ERROR: ios/ryP0.xcworkspace 不存在，实际内容："
+            find ios -maxdepth 2 -name "*.xcworkspace" -o -maxdepth 2 -name "*.xcodeproj" | head -10
+            exit 1
+          fi
+          echo "✓ xcworkspace 已生成"
       - name: Build unsigned IPA
         script: |
           set -e
