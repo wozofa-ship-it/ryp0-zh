@@ -1,0 +1,995 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  type TextInputProps,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { Stack, useRouter } from 'expo-router';
+import { useRepoStore } from '../../../store/useRepoStore';
+import type { RepoApp } from '../../../types/repo';
+import {
+  extractRepositoryApps,
+  importTelegramApp,
+  ImportSourceError,
+  listGitHubReleaseImportCandidates,
+  normalizeHttpsUrl,
+  type GitHubReleaseImportCandidate,
+} from '../../../services/import-sources';
+import { queuePrivateImport } from '../../../services/private-imports';
+import { ACCENT_COLORS, useAppTheme } from '../../../theme/app-preferences';
+import AppCategoryTabs from '../../../components/app-category-tabs';
+import AppRequestForm from '../../../components/app-request-form';
+import GitHubActionsCommitPicker from '../../../components/github-actions-commit-picker';
+import GitHubReleaseCandidatePicker from '../../../components/github-release-candidate-picker';
+import GitHubReleaseChannelPicker from '../../../components/github-release-channel-picker';
+import ImportDeliveryPicker from '../../../components/import-delivery-picker';
+import ImportUpdatePolicyPicker, {
+  ImportHistoryLimitPicker,
+} from '../../../components/import-update-policy-picker';
+import IpaUploader from '../../../components/ipa-uploader';
+import RepositoryImportReview, {
+  type StagedRepositoryApp,
+} from '../../../components/repository-import-review';
+import type { IpaUploadResult } from '../../../services/ipa-upload';
+import {
+  isGitHubRepositoryReference,
+  listGitHubActionBuildCommits,
+  type GitHubActionBuildCommit,
+} from '../../../services/github-action-builds';
+import type { ImportDeliveryMode, ImportHistoryLimit } from '../../../types/import-options';
+import type { GitHubReleaseChannel } from '../../../types/github-release-channel';
+import type { AppUpdatePolicy } from '../../../types/repo';
+
+const WORKSPACE_TABS = [
+  { id: 'add', label: 'Add Apps' },
+  { id: 'requests', label: 'App Requests' },
+  { id: 'manage', label: 'Manage Apps' },
+] as const;
+
+const IMPORT_METHODS = [
+  { id: 'direct', label: 'Direct IPA' },
+  { id: 'github', label: 'GitHub' },
+  { id: 'repo', label: 'Repo' },
+  { id: 'telegram', label: 'Telegram' },
+] as const;
+
+const CATEGORIES = [
+  { id: 'Sideloading', label: 'Sideloading' },
+  { id: 'Games', label: 'Games' },
+  { id: 'Social', label: 'Social' },
+  { id: 'EMU', label: 'EMU' },
+  { id: 'Movies', label: 'Movies' },
+  { id: 'Tools', label: 'Tools' },
+] as const;
+
+type WorkspaceTab = (typeof WORKSPACE_TABS)[number]['id'];
+type ImportMethod = (typeof IMPORT_METHODS)[number]['id'];
+type IconTarget = 'direct' | 'github' | 'telegram';
+type Theme = ReturnType<typeof useAppTheme>;
+
+function normalizedCategory(value?: string) {
+  const match = CATEGORIES.find((category) => category.id.toLowerCase() === value?.trim().toLowerCase());
+  return match?.id || 'Sideloading';
+}
+
+function prepareNewImport(app: RepoApp): RepoApp {
+  return {
+    ...app,
+    // Importers may attach an upstream source for the private automation
+    // service. Preserve its policy rather than silently turning a tracked app
+    // into a static one while it is added to repo.json.
+    updatePolicy: app.updatePolicy || 'static',
+    status: { state: 'unknown' },
+  };
+}
+
+function FormField({ label, theme, ...props }: TextInputProps & { label: string; theme: Theme }) {
+  return (
+    <View style={styles.field}>
+      <Text selectable style={[styles.inputLabel, { color: theme.label }]}>{label}</Text>
+      <TextInput
+        {...props}
+        style={[
+          styles.input,
+          props.multiline && styles.multilineInput,
+          { backgroundColor: theme.input, borderColor: theme.separator, color: theme.label },
+          props.style,
+        ]}
+        placeholderTextColor={theme.secondaryLabel}
+      />
+    </View>
+  );
+}
+
+function SectionCard({
+  title,
+  detail,
+  theme,
+  children,
+}: {
+  title: string;
+  detail?: string;
+  theme: Theme;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.formCard, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
+      <Text selectable style={[styles.sectionHeading, { color: theme.label }]}>{title}</Text>
+      {detail ? <Text selectable style={[styles.sectionSub, { color: theme.secondaryLabel }]}>{detail}</Text> : null}
+      {children}
+    </View>
+  );
+}
+
+function IconPickerRow({
+  value,
+  target,
+  theme,
+  accent,
+  onOpenGallery,
+}: {
+  value: string;
+  target: IconTarget;
+  theme: Theme;
+  accent: string;
+  onOpenGallery: (target: IconTarget) => void;
+}) {
+  return (
+    <View style={styles.iconPickerRow}>
+      {value ? (
+        <Image source={{ uri: value }} style={styles.iconPreview} contentFit="cover" />
+      ) : (
+        <View style={[styles.iconPlaceholder, { backgroundColor: theme.input, borderColor: theme.separator }]}>
+          <Text style={[styles.iconPlaceholderText, { color: theme.secondaryLabel }]}>图标</Text>
+        </View>
+      )}
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Choose icon from gallery"
+        onPress={() => onOpenGallery(target)}
+        style={[styles.galleryButton, { borderColor: accent }]}
+      >
+        <Text style={[styles.galleryButtonText, { color: accent }]}>从图标库选择</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export default function AddAppTabScreen() {
+  const router = useRouter();
+  const repo = useRepoStore((state) => state.repo);
+  const fetchRepo = useRepoStore((state) => state.fetchRepo);
+  const isDeveloperMode = useRepoStore((state) => state.isDeveloperMode);
+  const accentColor = useRepoStore((state) => state.accentColor);
+  const pendingIconSelection = useRepoStore((state) => state.pendingIconSelection);
+  const setPendingIconSelection = useRepoStore((state) => state.setPendingIconSelection);
+  const theme = useAppTheme();
+  const accent = ACCENT_COLORS[accentColor].value;
+
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('add');
+  const [importMethod, setImportMethod] = useState<ImportMethod>('direct');
+  const [isSaving, setIsSaving] = useState(false);
+  const telegramSubmissionLock = useRef(false);
+  const [iconTarget, setIconTarget] = useState<IconTarget | null>(null);
+
+  const [directUrl, setDirectUrl] = useState('');
+  const [directName, setDirectName] = useState('');
+  const [directDescription, setDirectDescription] = useState('');
+  const [directIconUrl, setDirectIconUrl] = useState('');
+  const [directCategory, setDirectCategory] = useState('Sideloading');
+  const [directDeliveryMode, setDirectDeliveryMode] = useState<ImportDeliveryMode>('direct-source');
+  const [directHistoryLimit, setDirectHistoryLimit] = useState<ImportHistoryLimit>(3);
+  const [directUploaderGeneration, setDirectUploaderGeneration] = useState(0);
+  // A file selected on the device is first placed in the private source
+  // repository.  Keep its opaque staging reference separate from a public
+  // direct URL so it can never accidentally be published before validation.
+  const [stagedIpa, setStagedIpa] = useState<IpaUploadResult | null>(null);
+
+  const [githubRepository, setGithubRepository] = useState('');
+  const [githubName, setGithubName] = useState('');
+  const [githubDescription, setGithubDescription] = useState('');
+  const [githubIconUrl, setGithubIconUrl] = useState('');
+  const [githubCategory, setGithubCategory] = useState('Sideloading');
+  const [githubDeliveryMode, setGithubDeliveryMode] = useState<ImportDeliveryMode>('direct-source');
+  const [githubUpdatePolicy, setGithubUpdatePolicy] = useState<AppUpdatePolicy>('daily');
+  const [githubHistoryLimit, setGithubHistoryLimit] = useState<ImportHistoryLimit>(3);
+  const [githubReleaseChannel, setGithubReleaseChannel] = useState<GitHubReleaseChannel>('release');
+  const [githubReleaseTag, setGithubReleaseTag] = useState('');
+  const [githubSelectedRelease, setGithubSelectedRelease] = useState<GitHubReleaseImportCandidate | null>(null);
+  const [githubReleaseCandidates, setGithubReleaseCandidates] = useState<GitHubReleaseImportCandidate[]>([]);
+  const [isLoadingGithubReleases, setIsLoadingGithubReleases] = useState(false);
+  const [githubReleasesLoadError, setGithubReleasesLoadError] = useState('');
+  const [githubReleasesTruncated, setGithubReleasesTruncated] = useState(false);
+  const [githubActionsCommit, setGithubActionsCommit] = useState('');
+  const [githubActionBuildCommits, setGithubActionBuildCommits] = useState<GitHubActionBuildCommit[]>([]);
+  const [isLoadingGithubActions, setIsLoadingGithubActions] = useState(false);
+  const [githubActionsLoadError, setGithubActionsLoadError] = useState('');
+
+  const [repoUrl, setRepoUrl] = useState('');
+  const [repoDeliveryMode, setRepoDeliveryMode] = useState<ImportDeliveryMode>('direct-source');
+  const [repoUpdatePolicy, setRepoUpdatePolicy] = useState<AppUpdatePolicy>('daily');
+  const [repoHistoryLimit, setRepoHistoryLimit] = useState<ImportHistoryLimit>(3);
+  const [stagedApps, setStagedApps] = useState<StagedRepositoryApp[]>([]);
+  const [isReviewSheetPresented, setIsReviewSheetPresented] = useState(false);
+
+  const [telegramName, setTelegramName] = useState('');
+  const [telegramDescription, setTelegramDescription] = useState('');
+  const [telegramSourceUrl, setTelegramSourceUrl] = useState('');
+  const [telegramDeveloper, setTelegramDeveloper] = useState('');
+  const [telegramBundleId, setTelegramBundleId] = useState('');
+  const [telegramIconUrl, setTelegramIconUrl] = useState('');
+  const [telegramCategory, setTelegramCategory] = useState('Sideloading');
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const app of repo?.apps || []) {
+      const category = normalizedCategory(app.category);
+      counts.set(category, (counts.get(category) || 0) + 1);
+    }
+    return counts;
+  }, [repo?.apps]);
+
+  useEffect(() => {
+    if (!pendingIconSelection || !iconTarget) return;
+    if (iconTarget === 'direct') setDirectIconUrl(pendingIconSelection);
+    if (iconTarget === 'github') setGithubIconUrl(pendingIconSelection);
+    if (iconTarget === 'telegram') setTelegramIconUrl(pendingIconSelection);
+    setPendingIconSelection(null);
+    setIconTarget(null);
+  }, [iconTarget, pendingIconSelection, setPendingIconSelection]);
+
+  // The catalogue contains public release metadata only. It deliberately does
+  // not use the administrator's credential: private automation resolves and
+  // validates the chosen IPA again before repo.json can change.
+  useEffect(() => {
+    const repository = githubRepository.trim();
+    if (!isGitHubRepositoryReference(repository)) {
+      setGithubReleaseCandidates([]);
+      setGithubSelectedRelease(null);
+      setGithubReleasesLoadError('');
+      setGithubReleasesTruncated(false);
+      setIsLoadingGithubReleases(false);
+      return;
+    }
+
+    let isCurrent = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setIsLoadingGithubReleases(true);
+      setGithubReleasesLoadError('');
+      void listGitHubReleaseImportCandidates(repository, { signal: controller.signal })
+        .then((catalogue) => {
+          if (!isCurrent) return;
+          setGithubReleaseCandidates([...catalogue.candidates]);
+          setGithubReleasesTruncated(catalogue.isTruncated);
+          setGithubSelectedRelease((current) => (
+            current && !catalogue.candidates.some((candidate) => candidate.id === current.id)
+              ? null
+              : current
+          ));
+        })
+        .catch((error: unknown) => {
+          if (!isCurrent || controller.signal.aborted) return;
+          setGithubReleaseCandidates([]);
+          setGithubSelectedRelease(null);
+          setGithubReleasesTruncated(false);
+          setGithubReleasesLoadError(error instanceof Error ? error.message : '无法加载 GitHub 版本。');
+        })
+        .finally(() => {
+          if (isCurrent) setIsLoadingGithubReleases(false);
+        });
+    }, 450);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [githubRepository]);
+
+  useEffect(() => {
+    const repository = githubRepository.trim();
+    if (githubReleaseChannel !== 'actions' || !isGitHubRepositoryReference(repository)) {
+      setGithubActionBuildCommits([]);
+      setGithubActionsLoadError('');
+      setIsLoadingGithubActions(false);
+      return;
+    }
+
+    let isCurrent = true;
+    const timer = setTimeout(() => {
+      setIsLoadingGithubActions(true);
+      setGithubActionsLoadError('');
+      void listGitHubActionBuildCommits(repository)
+        .then((commits) => {
+          if (!isCurrent) return;
+          setGithubActionBuildCommits(commits);
+          setGithubActionsCommit((current) => (current && !commits.some((commit) => commit.sha === current) ? '' : current));
+        })
+        .catch((error: unknown) => {
+          if (!isCurrent) return;
+          setGithubActionBuildCommits([]);
+          setGithubActionsCommit('');
+          setGithubActionsLoadError(error instanceof Error ? error.message : '无法加载成功的 Actions 构建。');
+        })
+        .finally(() => {
+          if (isCurrent) setIsLoadingGithubActions(false);
+        });
+    }, 350);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [githubReleaseChannel, githubRepository]);
+
+  const openIconGallery = useCallback((target: IconTarget) => {
+    setIconTarget(target);
+    router.push('/icons?mode=select');
+  }, [router]);
+
+  const handleGitHubRepositoryChange = useCallback((value: string) => {
+    // Never let a candidate from a previously typed repository be dispatched
+    // against a new repository reference while the debounced catalogue reloads.
+    setGithubRepository(value);
+    setGithubSelectedRelease(null);
+    setGithubReleaseCandidates([]);
+    setGithubReleasesLoadError('');
+    setGithubReleasesTruncated(false);
+    setGithubActionsCommit('');
+  }, []);
+
+  const handleIpaUploaded = useCallback((result: IpaUploadResult) => {
+    setStagedIpa(result);
+    setDirectUrl('');
+    setDirectName((current) => {
+      if (current.trim()) return current;
+      return result.originalFilename
+        .replace(/\.ipa$/i, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+    });
+  }, []);
+
+  const handleDirectUrlChange = useCallback((value: string) => {
+    setDirectUrl(value);
+    // Typing a URL deliberately switches back to the direct-link flow. The
+    // private staged asset remains inaccessible to users and is not queued.
+    if (value.trim()) setStagedIpa(null);
+  }, []);
+
+  const handleAddDirect = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const upload = stagedIpa;
+      const downloadURL = upload ? '' : normalizeHttpsUrl(directUrl, 'IPA download URL');
+      const filename = upload
+        ? upload.originalFilename.replace(/\.ipa$/i, '')
+        : downloadURL.split('/').pop()?.replace(/\.ipa(?:\?.*)?$/i, '') || 'Direct App';
+      const name = directName.trim() || decodeURIComponent(filename).replace(/[-_]+/g, ' ');
+      const description = directDescription.trim() || (
+        upload
+          ? 'Uploaded IPA pending private validation.'
+          : 'Imported from a verified direct IPA link.'
+      );
+      await queuePrivateImport({
+        method: upload ? 'upload-artifact' : 'direct-url',
+        sourceUrl: downloadURL || undefined,
+        appName: name,
+        description,
+        category: directCategory,
+        iconUrl: directIconUrl || undefined,
+        deliveryMode: upload ? 'mirror-release' : directDeliveryMode,
+        updatePolicy: 'static',
+        historyLimit: directHistoryLimit,
+        ...(upload ? {
+          uploadRepository: upload.uploadRepository,
+          uploadReleaseTag: upload.stagingReleaseTag,
+          uploadArtifactName: upload.filename,
+        } : {}),
+      });
+      setDirectUrl('');
+      setDirectName('');
+      setDirectDescription('');
+      setDirectIconUrl('');
+      setDirectDeliveryMode('direct-source');
+      setDirectHistoryLimit(3);
+      setStagedIpa(null);
+      setDirectUploaderGeneration((generation) => generation + 1);
+      Alert.alert(
+        upload ? 'Uploaded IPA Queued' : 'Direct IPA Queued',
+        upload
+          ? 'The private importer will inspect the local IPA, then keep its verified mirror copy before changing repo.json.'
+          : 'The private importer will inspect metadata and preserve the original source link unless you explicitly chose a mirror copy.',
+      );
+    } catch (error: any) {
+      Alert.alert('无法排队 IPA', error instanceof ImportSourceError ? error.message : error?.message || '检查 IPA 和图标 URL。');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [directCategory, directDeliveryMode, directDescription, directHistoryLimit, directIconUrl, directName, directUrl, stagedIpa]);
+
+  const handleAddGithub = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      // A Daily source follows a moving channel (and, when chosen, the same
+      // IPA asset name). A Static import pins the exact release tag + asset.
+      // Raw source tags remain manual because a Git tag alone does not prove
+      // that an installable IPA exists.
+      const selectedRelease = githubSelectedRelease;
+      const effectiveReleaseChannel: GitHubReleaseChannel = selectedRelease
+        ? githubUpdatePolicy === 'static' ? 'tag' : selectedRelease.channel
+        : githubReleaseChannel;
+      // Start a selected Daily source at the exact verified release/asset,
+      // then let its registered updater advance only within that channel and
+      // asset family. Without this tag, a versioned filename selected from an
+      // older release could be looked up against the newest release instead.
+      const effectiveReleaseTag = selectedRelease
+        ? selectedRelease.releaseTag
+        : effectiveReleaseChannel === 'tag' ? githubReleaseTag.trim() : undefined;
+      const effectiveReleaseAssetName = selectedRelease?.assetName;
+
+      if (effectiveReleaseChannel === 'tag' && !effectiveReleaseTag) {
+        Alert.alert('需要版本标签', '输入要导入的准确 GitHub 标签。');
+        return;
+      }
+      const importDispatch = await queuePrivateImport({
+        method: 'github',
+        sourceUrl: githubRepository,
+        appName: githubName || undefined,
+        description: githubDescription || undefined,
+        iconUrl: githubIconUrl || undefined,
+        category: githubCategory,
+        deliveryMode: effectiveReleaseChannel === 'actions' ? 'mirror-release' : githubDeliveryMode,
+        updatePolicy: githubUpdatePolicy,
+        historyLimit: githubUpdatePolicy === 'daily' ? 1 : githubHistoryLimit,
+        githubReleaseChannel: effectiveReleaseChannel,
+        githubReleaseTag: effectiveReleaseTag,
+        githubReleaseAssetName: effectiveReleaseAssetName,
+        githubActionsCommit: effectiveReleaseChannel === 'actions' ? githubActionsCommit : undefined,
+      });
+      setGithubRepository('');
+      setGithubName('');
+      setGithubDescription('');
+      setGithubIconUrl('');
+      setGithubDeliveryMode('direct-source');
+      setGithubUpdatePolicy('daily');
+      setGithubHistoryLimit(3);
+      setGithubReleaseChannel('release');
+      setGithubReleaseTag('');
+      setGithubSelectedRelease(null);
+      setGithubActionsCommit('');
+      Alert.alert('GitHub 导入已开始',
+        effectiveReleaseChannel === 'actions'
+          ? 'GitHub accepted the request and is validating the Actions artifact in the background. It has not been added to the catalog yet. Actions artifacts expire, so a verified mirror will be kept if validation succeeds.'
+          : 'GitHub accepted the request and is validating the selected source in the background. It has not been added to the catalog yet. The original link will be kept unless you chose a mirror.',
+        importDispatch.workflowUrl
+          ? [
+              {
+                text: 'View Import Status',
+                onPress: () => {
+                  void Linking.openURL(importDispatch.workflowUrl!).catch(() => {
+                    Alert.alert('无法打开导入状态', '请在浏览器中打开 GitHub Actions 查看此次导入。');
+                  });
+                },
+              },
+              { text: 'OK', style: 'cancel' },
+            ]
+          : undefined,
+      );
+    } catch (error: any) {
+      Alert.alert('GitHub 导入失败', error?.message || '无法将此 GitHub 来源排队验证。');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [githubActionsCommit, githubCategory, githubDeliveryMode, githubDescription, githubHistoryLimit, githubIconUrl, githubName, githubReleaseChannel, githubReleaseTag, githubRepository, githubSelectedRelease, githubUpdatePolicy]);
+
+  const handleExtractRepository = useCallback(async () => {
+    setIsSaving(true);
+    try {
+      const apps = await extractRepositoryApps(repoUrl);
+      const existingBundleIds = new Set((repo?.apps || []).map((app) => app.bundleIdentifier));
+      const newApps = apps.filter((app) => !existingBundleIds.has(app.bundleIdentifier));
+      if (!newApps.length) {
+        Alert.alert('没有新内容可导入', '该仓库中的每个有效应用已存在于你的 repo.json。');
+        return;
+      }
+      setStagedApps(newApps.map((app) => ({
+        app: prepareNewImport(app),
+        selected: true,
+        category: normalizedCategory(app.category),
+      })));
+      setIsReviewSheetPresented(true);
+    } catch (error: any) {
+      Alert.alert('仓库解析失败', error?.message || '无法安全读取此 repo.json。');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [repo?.apps, repoUrl]);
+
+  const toggleStaged = useCallback((bundleIdentifier: string) => {
+    setStagedApps((items) => items.map((item) => (
+      item.app.bundleIdentifier === bundleIdentifier ? { ...item, selected: !item.selected } : item
+    )));
+  }, []);
+
+  const setStagedSelected = useCallback((bundleIdentifiers: readonly string[], selected: boolean) => {
+    const identifiers = new Set(bundleIdentifiers);
+    if (!identifiers.size) {
+      if (!selected) {
+        setStagedApps((items) => items.map((item) => item.selected ? { ...item, selected: false } : item));
+      }
+      return;
+    }
+    setStagedApps((items) => items.map((item) => (
+      identifiers.has(item.app.bundleIdentifier) && item.selected !== selected
+        ? { ...item, selected }
+        : item
+    )));
+  }, []);
+
+  const setStagedCategory = useCallback((bundleIdentifier: string, category: string) => {
+    setStagedApps((items) => items.map((item) => (
+      item.app.bundleIdentifier === bundleIdentifier ? { ...item, category } : item
+    )));
+  }, []);
+
+  const handleMergeReviewedApps = useCallback(async () => {
+    const selected = stagedApps
+      .filter((item) => item.selected)
+      .map(({ app, category }) => ({ app, category }));
+    if (!selected.length) {
+      Alert.alert('选择应用', '请至少选择一个应用排队验证。');
+      return;
+    }
+    setIsSaving(true);
+    let queued = 0;
+    try {
+      const sourceUrl = normalizeHttpsUrl(repoUrl, 'Repository URL');
+      for (const { app, category } of selected) {
+        await queuePrivateImport({
+          method: 'repository',
+          sourceUrl,
+          appName: app.name,
+          description: app.localizedDescription || app.subtitle || undefined,
+          iconUrl: app.iconURL || undefined,
+          category,
+          selector: app.bundleIdentifier,
+          deliveryMode: repoDeliveryMode,
+          updatePolicy: repoUpdatePolicy,
+          historyLimit: repoUpdatePolicy === 'daily' ? 1 : repoHistoryLimit,
+        });
+        queued += 1;
+      }
+      setIsReviewSheetPresented(false);
+      setStagedApps([]);
+      setRepoUrl('');
+      setRepoDeliveryMode('direct-source');
+      setRepoUpdatePolicy('daily');
+      setRepoHistoryLimit(3);
+      Alert.alert('仓库导入已排队',
+        `${queued} ${queued === 1 ? 'app is' : 'apps are'} being checked from the source repository before any catalog change is published. Original source links stay in place unless you chose a mirror.`,
+      );
+    } catch (error: any) {
+      Alert.alert('仓库队列已暂停',
+        queued
+          ? `${queued} ${queued === 1 ? 'app was' : 'apps were'} queued before this problem: ${error?.message || '无法排队下一个应用。'}`
+          : error?.message || '无法排队此仓库导入。',
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }, [repoDeliveryMode, repoHistoryLimit, repoUpdatePolicy, repoUrl, stagedApps]);
+
+  const handleAddTelegram = useCallback(async () => {
+    if (!telegramName.trim() || !telegramDescription.trim()) {
+      Alert.alert('完善应用信息', 'Telegram 导入文件前需要填写名称和描述。');
+      return;
+    }
+    if (telegramSubmissionLock.current) return;
+    telegramSubmissionLock.current = true;
+    setIsSaving(true);
+    try {
+      const result = await importTelegramApp({
+        name: telegramName,
+        description: telegramDescription,
+        category: telegramCategory,
+        sourceUrl: telegramSourceUrl,
+        iconURL: telegramIconUrl || undefined,
+        developerName: telegramDeveloper || undefined,
+        bundleIdentifier: telegramBundleId || undefined,
+      });
+      if (result.kind === 'queued') {
+        setTelegramName('');
+        setTelegramDescription('');
+        setTelegramSourceUrl('');
+        setTelegramDeveloper('');
+        setTelegramBundleId('');
+        setTelegramIconUrl('');
+        Alert.alert('Telegram 导入已排队',
+          'GitHub Actions is securely downloading the IPA, validating its metadata, uploading it to R2, and updating repo.json. This usually takes several minutes.',
+          [
+            { text: 'Done', style: 'cancel' },
+            { text: 'View Progress', onPress: () => router.push('/workflows') },
+          ],
+        );
+        return;
+      }
+
+      Alert.alert('Telegram 导入', '私有导入器未返回排队确认，请刷新 Workflows 后重试。');
+    } catch (error: any) {
+      Alert.alert('Telegram 导入失败', error?.message || 'Telegram 导入服务无法处理此消息。');
+    } finally {
+      telegramSubmissionLock.current = false;
+      setIsSaving(false);
+    }
+  }, [
+    router,
+    telegramBundleId,
+    telegramCategory,
+    telegramDescription,
+    telegramDeveloper,
+    telegramIconUrl,
+    telegramName,
+    telegramSourceUrl,
+  ]);
+
+  if (!isDeveloperMode) return <AppRequestForm />;
+
+  const primaryButton = (label: string, onPress: () => void) => (
+    <TouchableOpacity
+      accessibilityRole="button"
+      disabled={isSaving}
+      onPress={onPress}
+      style={[styles.submitBtn, { backgroundColor: accent, opacity: isSaving ? 0.62 : 1 }]}
+    >
+      {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitBtnText}>{label}</Text>}
+    </TouchableOpacity>
+  );
+
+  return (
+    <>
+      <Stack.Screen options={{ title: '添加应用', headerLargeTitle: true }} />
+      {isDeveloperMode ? (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button icon="tray.full" onPress={() => router.push('/requests')} />
+        </Stack.Toolbar>
+      ) : null}
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <AppCategoryTabs
+          categories={WORKSPACE_TABS}
+          selectedCategory={workspaceTab}
+          onSelectCategory={(tab) => {
+            if (tab === 'requests') {
+              router.push('/requests');
+              return;
+            }
+            setWorkspaceTab(tab as WorkspaceTab);
+          }}
+          accentColor={accent}
+        />
+
+        {workspaceTab === 'add' ? (
+          <>
+            <View style={[styles.guideCard, { backgroundColor: theme.surface, borderColor: theme.separator }]}>
+              <Text selectable style={[styles.guideTitle, { color: theme.label }]}>添加来源，然后私有验证</Text>
+              <Text selectable style={[styles.guideText, { color: theme.secondaryLabel }]}>GitHub 最适合重复发布。仓库导入在合并前会经过审核。Telegram 文件在服务端处理，R2 和 GitHub 凭证保持私密。</Text>
+            </View>
+            <AppCategoryTabs
+              categories={IMPORT_METHODS}
+              selectedCategory={importMethod}
+              onSelectCategory={(method) => setImportMethod(method as ImportMethod)}
+              accentColor={accent}
+            />
+
+            {importMethod === 'direct' ? (
+              <SectionCard title="直接 IPA" detail="粘贴已验证的 HTTPS .ipa 链接，或选择本地 IPA。上传的文件在导入器验证前保留在私有暂存区，此界面不会向 repo.json 添加任何内容。" theme={theme}>
+                <IpaUploader
+                  key={directUploaderGeneration}
+                  accentColor={accent}
+                  disabled={isSaving}
+                  labelColor={theme.label}
+                  secondaryLabelColor={theme.secondaryLabel}
+                  onUploaded={handleIpaUploaded}
+                />
+                {stagedIpa ? (
+                  <Text selectable style={[styles.stagedUploadDetail, { color: theme.secondaryLabel }]}>
+                    {stagedIpa.originalFilename} is in private validation staging. Clear this by entering a direct URL instead.
+                  </Text>
+                ) : null}
+                <FormField theme={theme} label={stagedIpa ? 'Or use a Direct IPA URL' : 'IPA Download URL'} placeholder="https://example.com/app.ipa" value={directUrl} onChangeText={handleDirectUrlChange} autoCapitalize="none" keyboardType="url" />
+                <ImportDeliveryPicker
+                  accentColor={accent}
+                  allowedModes={stagedIpa ? ['mirror-release'] : ['direct-source', 'mirror-release']}
+                  detail={stagedIpa
+                    ? 'Local IPA uploads have no permanent upstream URL, so ryP0 keeps one verified mirror copy.'
+                    : 'Use the original URL by default. Choose a mirror only when you explicitly want ryP0 to keep a copy.'}
+                  disabled={isSaving || Boolean(stagedIpa)}
+                  onChange={setDirectDeliveryMode}
+                  value={stagedIpa ? 'mirror-release' : directDeliveryMode}
+                />
+                <ImportUpdatePolicyPicker
+                  accentColor={accent}
+                  detail="一次性直接 IPA 链接需手动维护，来源变更时请自行添加新版本。"
+                  disabled
+                  onChange={() => undefined}
+                  value="static"
+                />
+                <ImportHistoryLimitPicker
+                  accentColor={accent}
+                  disabled={isSaving}
+                  onChange={setDirectHistoryLimit}
+                  value={directHistoryLimit}
+                />
+                <FormField theme={theme} label="应用显示名称（可选）" placeholder="自动从 IPA 文件名推导" value={directName} onChangeText={setDirectName} />
+                <FormField theme={theme} label="描述（可选）" placeholder="这个应用是做什么的？" value={directDescription} onChangeText={setDirectDescription} multiline />
+                <FormField theme={theme} label="图标 URL（可选）" placeholder="https://…/icon.png" value={directIconUrl} onChangeText={setDirectIconUrl} autoCapitalize="none" keyboardType="url" />
+                <IconPickerRow value={directIconUrl} target="direct" theme={theme} accent={accent} onOpenGallery={openIconGallery} />
+                <Text selectable style={[styles.inputLabel, { color: theme.label }]}>分类</Text>
+                <AppCategoryTabs categories={CATEGORIES} selectedCategory={directCategory} onSelectCategory={setDirectCategory} accentColor={accent} />
+                {primaryButton('Add Direct IPA', () => void handleAddDirect())}
+              </SectionCard>
+            ) : null}
+
+            {importMethod === 'github' ? (
+              <SectionCard title="GitHub 应用查找器" detail="浏览稳定版、Beta、Alpha、Nightly、其他预发布、版本标签或成功的 Actions 构建。导入器优先使用应用元数据，绝不会用开发者头像作为应用图标。" theme={theme}>
+                <FormField theme={theme} label="GitHub 仓库" placeholder="owner/repository or https://github.com/owner/repository" value={githubRepository} onChangeText={handleGitHubRepositoryChange} autoCapitalize="none" />
+                <Text selectable style={[styles.inputLabel, { color: theme.label }]}>发布来源</Text>
+                <Text selectable style={[styles.pickerHint, { color: theme.secondaryLabel }]}>选择用于每日跟踪的渠道、用于固定静态构建的版本标签，或一次成功的 Workflow 构建。</Text>
+                <GitHubReleaseChannelPicker
+                  accentColor={accent}
+                  disabled={isSaving}
+                  value={githubReleaseChannel}
+                  onChange={(nextChannel) => {
+                    setGithubReleaseChannel(nextChannel);
+                    setGithubSelectedRelease(null);
+                    setGithubReleaseTag('');
+                    if (nextChannel === 'actions') setGithubDeliveryMode('mirror-release');
+                    if (nextChannel === 'tag') setGithubUpdatePolicy('static');
+                  }}
+                />
+                {githubReleaseChannel !== 'actions' ? (
+                  <>
+                    <Text selectable style={[styles.inputLabel, { color: theme.label }]}>精确版本（可选）</Text>
+                    <Text selectable style={[styles.pickerHint, { color: theme.secondaryLabel }]}>每日跟踪所选渠道和 IPA 文件名。静态固定你选择的准确标签和 IPA 文件。</Text>
+                    <GitHubReleaseCandidatePicker
+                      accentColor={accent}
+                      candidates={githubReleaseCandidates}
+                      disabled={isSaving || !isGitHubRepositoryReference(githubRepository)}
+                      isLoading={isLoadingGithubReleases}
+                      isTruncated={githubReleasesTruncated}
+                      onChange={(candidate) => {
+                        setGithubSelectedRelease(candidate);
+                        if (candidate) {
+                          setGithubReleaseChannel(candidate.channel);
+                          setGithubReleaseTag('');
+                          setGithubActionsCommit('');
+                        }
+                      }}
+                      value={githubSelectedRelease}
+                    />
+                    {githubReleasesLoadError ? (
+                      <Text selectable style={[styles.actionsLoadError, { color: theme.secondaryLabel }]}>{githubReleasesLoadError}</Text>
+                    ) : null}
+                  </>
+                ) : null}
+                {githubReleaseChannel === 'tag' ? (
+                  <FormField theme={theme} label="来源标签" placeholder="v1.2.3" value={githubReleaseTag} onChangeText={setGithubReleaseTag} autoCapitalize="none" />
+                ) : null}
+                {githubReleaseChannel === 'actions' ? (
+                  <>
+                    <GitHubActionsCommitPicker
+                      accentColor={accent}
+                      commits={githubActionBuildCommits}
+                      disabled={isSaving || !isGitHubRepositoryReference(githubRepository)}
+                      isLoading={isLoadingGithubActions}
+                      onChange={setGithubActionsCommit}
+                      value={githubActionsCommit}
+                    />
+                    {githubActionsLoadError ? (
+                      <Text selectable style={[styles.actionsLoadError, { color: theme.secondaryLabel }]}>{githubActionsLoadError}</Text>
+                    ) : null}
+                  </>
+                ) : null}
+                <ImportDeliveryPicker
+                  accentColor={accent}
+                  allowedModes={githubReleaseChannel === 'actions' ? ['mirror-release'] : ['direct-source', 'mirror-release']}
+                  detail={githubReleaseChannel === 'actions'
+                    ? 'GitHub Actions artifacts expire, so this source must be copied to a verified mirror.'
+                    : 'Use the upstream download URL by default. Choose a mirror only when you explicitly want ryP0 to retain a copy.'}
+                  disabled={isSaving || githubReleaseChannel === 'actions'}
+                  onChange={setGithubDeliveryMode}
+                  value={githubReleaseChannel === 'actions' ? 'mirror-release' : githubDeliveryMode}
+                />
+                <ImportUpdatePolicyPicker
+                  accentColor={accent}
+                  detail={githubReleaseChannel === 'tag'
+                    ? 'A raw Git tag is an exact build, so it is always Static / manual. Choose Release, Beta, Alpha, Nightly, or Pre-release for daily tracking.'
+                    : githubUpdatePolicy === 'daily'
+                    ? 'Checks the selected source each day and keeps only the newest version.'
+                    : 'Stops automatic checks so you can manage a manual version history.'}
+                  disabled={isSaving || githubReleaseChannel === 'tag'}
+                  onChange={setGithubUpdatePolicy}
+                  value={githubReleaseChannel === 'tag' ? 'static' : githubUpdatePolicy}
+                />
+                {githubUpdatePolicy === 'static' ? (
+                  <ImportHistoryLimitPicker
+                    accentColor={accent}
+                    disabled={isSaving}
+                    onChange={setGithubHistoryLimit}
+                    value={githubHistoryLimit}
+                  />
+                ) : null}
+                <FormField theme={theme} label="重命名应用（可选）" placeholder="保留仓库名称" value={githubName} onChangeText={setGithubName} />
+                <FormField theme={theme} label="描述（可选）" placeholder="使用版本或仓库描述" value={githubDescription} onChangeText={setGithubDescription} multiline />
+                <FormField theme={theme} label="图标 URL（可选）" placeholder="为空时自动检测" value={githubIconUrl} onChangeText={setGithubIconUrl} autoCapitalize="none" keyboardType="url" />
+                <IconPickerRow value={githubIconUrl} target="github" theme={theme} accent={accent} onOpenGallery={openIconGallery} />
+                <Text selectable style={[styles.inputLabel, { color: theme.label }]}>分类</Text>
+                <AppCategoryTabs categories={CATEGORIES} selectedCategory={githubCategory} onSelectCategory={setGithubCategory} accentColor={accent} />
+                {primaryButton('Find & Add App', () => void handleAddGithub())}
+              </SectionCard>
+            ) : null}
+
+            {importMethod === 'repo' ? (
+              <SectionCard title="仓库提取器" detail="解析兼容的 repo.json，搜索所有有效应用，选择需要的条目，并为每个设置分类，然后再写入。" theme={theme}>
+                <FormField theme={theme} label="仓库 JSON URL" placeholder="https://community.example/repo.json" value={repoUrl} onChangeText={setRepoUrl} autoCapitalize="none" keyboardType="url" />
+                <ImportDeliveryPicker
+                  accentColor={accent}
+                  detail="Use each selected app’s original source link by default. A mirror is an explicit per-import choice."
+                  disabled={isSaving}
+                  onChange={setRepoDeliveryMode}
+                  value={repoDeliveryMode}
+                />
+                <ImportUpdatePolicyPicker
+                  accentColor={accent}
+                  detail={repoUpdatePolicy === 'daily'
+                    ? 'Checks each selected source daily and keeps only its newest version.'
+                    : 'Stops automatic checks so you can manage a manual version history.'}
+                  disabled={isSaving}
+                  onChange={setRepoUpdatePolicy}
+                  value={repoUpdatePolicy}
+                />
+                {repoUpdatePolicy === 'static' ? (
+                  <ImportHistoryLimitPicker
+                    accentColor={accent}
+                    disabled={isSaving}
+                    onChange={setRepoHistoryLimit}
+                    value={repoHistoryLimit}
+                  />
+                ) : null}
+                {primaryButton('Extract & Review Apps', () => void handleExtractRepository())}
+                {stagedApps.length ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    disabled={isSaving}
+                    onPress={() => setIsReviewSheetPresented(true)}
+                    style={[styles.secondaryButton, styles.reviewAgainButton, { borderColor: accent }]}
+                  >
+                    <Text style={[styles.secondaryButtonText, { color: accent }]}>Review {stagedApps.length} Extracted Apps</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </SectionCard>
+            ) : null}
+
+            {importMethod === 'telegram' ? (
+              <SectionCard title="Telegram 导入器" detail="Telegram 下载和 Cloudflare R2 存储仅在受保护的服务端 Worker 中运行，应用内不保存 Telegram 会话、R2 密钥或 GitHub 凭证。" theme={theme}>
+                <FormField theme={theme} label="应用名称" placeholder="应用名称" value={telegramName} onChangeText={setTelegramName} />
+                <FormField theme={theme} label="描述" placeholder="为用户描述此应用" value={telegramDescription} onChangeText={setTelegramDescription} multiline />
+                <FormField theme={theme} label="Telegram 消息链接" placeholder="https://t.me/channel/123" value={telegramSourceUrl} onChangeText={setTelegramSourceUrl} autoCapitalize="none" keyboardType="url" />
+                <FormField theme={theme} label="Bundle ID（可选）" placeholder="让导入器自动发现" value={telegramBundleId} onChangeText={setTelegramBundleId} autoCapitalize="none" />
+                <FormField theme={theme} label="开发者名称（可选）" placeholder="让导入器使用来源元数据" value={telegramDeveloper} onChangeText={setTelegramDeveloper} />
+                <FormField theme={theme} label="图标 URL（可选）" placeholder="https://…/icon.png" value={telegramIconUrl} onChangeText={setTelegramIconUrl} autoCapitalize="none" keyboardType="url" />
+                <IconPickerRow value={telegramIconUrl} target="telegram" theme={theme} accent={accent} onOpenGallery={openIconGallery} />
+                <ImportDeliveryPicker
+                  accentColor={accent}
+                  allowedModes={['r2']}
+                  detail="Telegram IPA 文件始终经过验证，然后存入受保护的 R2 存储桶。"
+                  disabled
+                  onChange={() => undefined}
+                  value="r2"
+                />
+                <ImportUpdatePolicyPicker
+                  accentColor={accent}
+                  detail="Telegram 来源每日检查，仅保留最新验证版本。"
+                  disabled
+                  onChange={() => undefined}
+                  value="daily"
+                />
+                <Text selectable style={[styles.inputLabel, { color: theme.label }]}>分类</Text>
+                <AppCategoryTabs categories={CATEGORIES} selectedCategory={telegramCategory} onSelectCategory={setTelegramCategory} accentColor={accent} />
+                {primaryButton('Queue Telegram Import', () => void handleAddTelegram())}
+              </SectionCard>
+            ) : null}
+          </>
+        ) : null}
+
+        {workspaceTab === 'manage' ? (
+          <>
+            <SectionCard title="仓库概览" detail={String(repo?.apps.length || 0) + ' published ' + ((repo?.apps.length || 0) === 1 ? 'app.' : 'apps.') + ' Changes are committed through the authenticated GitHub Contents API.'} theme={theme}>
+              <View style={styles.categorySummary}>
+                {CATEGORIES.map((category) => (
+                  <View key={category.id} style={[styles.categorySummaryRow, { borderColor: theme.separator }]}>
+                    <Text selectable style={[styles.categorySummaryLabel, { color: theme.label }]}>{category.label}</Text>
+                    <Text selectable style={[styles.categorySummaryValue, { color: theme.secondaryLabel }]}>{categoryCounts.get(category.id) || 0}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.navigate('/(tabs)/(apps)')} style={[styles.submitBtn, { backgroundColor: accent }]}>
+                <Text style={styles.submitBtnText}>打开应用面板</Text>
+              </TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" onPress={() => void fetchRepo()} style={[styles.secondaryButton, { borderColor: accent }]}> 
+                <Text style={[styles.secondaryButtonText, { color: accent }]}>从 GitHub 刷新仓库</Text>
+              </TouchableOpacity>
+            </SectionCard>
+            <SectionCard title="应用自动化" detail="管理每个已发布应用的私有更新器：运行、更新来源、暂停每日检查，或仅移除其自动化。" theme={theme}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/workflows')} style={[styles.submitBtn, { backgroundColor: accent }]}> 
+                <Text style={styles.submitBtnText}>管理应用自动化</Text>
+              </TouchableOpacity>
+            </SectionCard>
+          </>
+        ) : null}
+      </ScrollView>
+
+      <RepositoryImportReview
+        accentColor={accent}
+        apps={stagedApps}
+        categories={CATEGORIES}
+        colors={theme}
+        isPresented={isReviewSheetPresented}
+        isSaving={isSaving}
+        onDismiss={() => setIsReviewSheetPresented(false)}
+        onMerge={() => void handleMergeReviewedApps()}
+        onSetCategory={setStagedCategory}
+        onSetSelected={setStagedSelected}
+        onToggleSelected={toggleStaged}
+      />
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  contentContainer: { paddingBottom: 132 },
+  guideCard: { marginHorizontal: 16, marginBottom: 14, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, borderCurve: 'continuous' },
+  guideTitle: { fontSize: 16, fontWeight: '700' },
+  guideText: { marginTop: 5, fontSize: 13, lineHeight: 18 },
+  formCard: { marginHorizontal: 16, marginBottom: 16, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, borderCurve: 'continuous' },
+  sectionHeading: { fontSize: 18, fontWeight: '700' },
+  sectionSub: { marginTop: 5, marginBottom: 16, fontSize: 13, lineHeight: 18 },
+  stagedUploadDetail: { marginTop: -4, marginBottom: 12, fontSize: 12, lineHeight: 17 },
+  field: { marginBottom: 14 },
+  inputLabel: { marginBottom: 6, fontSize: 13, fontWeight: '600' },
+  pickerHint: { fontSize: 12, lineHeight: 17, marginTop: -3, marginBottom: 4 },
+  input: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, fontSize: 15 },
+  multilineInput: { minHeight: 78, textAlignVertical: 'top' },
+  actionsLoadError: { fontSize: 13, lineHeight: 18, marginTop: -8, marginBottom: 14 },
+  iconPickerRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginBottom: 16 },
+  iconPreview: { width: 48, height: 48, borderRadius: 11, borderCurve: 'continuous', backgroundColor: 'rgba(120, 120, 128, 0.16)' },
+  iconPlaceholder: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderCurve: 'continuous' },
+  iconPlaceholderText: { fontSize: 10, fontWeight: '600' },
+  galleryButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1 },
+  galleryButtonText: { fontSize: 13, fontWeight: '600' },
+  submitBtn: { minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 8, borderRadius: 14 },
+  submitBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  secondaryButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12 },
+  secondaryButtonText: { fontSize: 14, fontWeight: '700' },
+  reviewAgainButton: { marginTop: 10 },
+  categorySummary: { marginBottom: 12 },
+  categorySummaryRow: { minHeight: 42, alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
+  categorySummaryLabel: { fontSize: 15 },
+  categorySummaryValue: { fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+});
