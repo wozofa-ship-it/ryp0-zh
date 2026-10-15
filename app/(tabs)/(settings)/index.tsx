@@ -11,6 +11,7 @@ import {
   AccentColor,
   AppearancePreference,
 } from '../../../theme/app-preferences';
+import TgViewer from '../../../components/tg-viewer';
 
 
 const DISCORD_URL = 'https://discord.gg/6r2Eax4c5j';
@@ -289,7 +290,11 @@ export default function Settings() {
         </FieldGroup.Section>
 
               
-              <FieldGroup.Section title="社区">
+              
+                        <FieldGroup.Section title="TG 频道">
+            <TgViewer />
+          </FieldGroup.Section>
+<FieldGroup.Section title="社区">
           <ListItem
             onPress={() => void handleOpenLink(DISCORD_URL, 'Discord')}
             leading={<SettingsSymbol name="message.fill" color={accentValue} />}
