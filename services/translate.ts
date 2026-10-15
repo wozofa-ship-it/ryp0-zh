@@ -47,6 +47,23 @@ async function fetchTranslation(text: string): Promise<string> {
     pumpQueue();
   }
 }
+/**
+ * 安全解码 URL 编码的描述文本（如 %20 → 空格）。
+ * 解码失败时返回原文。
+ */
+export function decodeDescription(text: string): string {
+  const t = (text || '').trim();
+  if (!t || !t.includes('%')) return text;
+  try {
+    // 先处理 %20 这种标准编码，再处理不完整的
+    return decodeURIComponent(t);
+  } catch {
+    // 部分编码损坏时，逐个替换常见的
+    return t.replace(/%20/g, ' ').replace(/%2F/gi, '/').replace(/%3A/gi, ':');
+  }
+}
+
+
 
 /**
  * 翻译英文应用介绍为中文。
