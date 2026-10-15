@@ -259,7 +259,7 @@ function AuthorizedAppAutomationManagerScreen() {
         ? 'Daily updates will skip this app. Its public catalog entry and IPA history stay untouched.'
         : 'This app will return to the daily update queue.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
           text: enabled ? 'Disable' : 'Enable',
           style: enabled ? 'destructive' : 'default',
@@ -275,7 +275,7 @@ function AuthorizedAppAutomationManagerScreen() {
       `Remove ${selected.displayName} automation?`,
       'This removes only its private updater and manual launcher. It does not delete the app, repo.json data, or IPA releases.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         { text: 'Remove Automation', style: 'destructive', onPress: () => void queueMutation('delete') },
       ],
     );
