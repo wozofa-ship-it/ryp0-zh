@@ -11,7 +11,6 @@ import {
   AccentColor,
   AppearancePreference,
 } from '../../../theme/app-preferences';
-import TgMonitorSection from '../../../components/tg-monitor-section';
 
 
 const DISCORD_URL = 'https://discord.gg/6r2Eax4c5j';
@@ -289,7 +288,6 @@ export default function Settings() {
           </ListItem>
         </FieldGroup.Section>
 
-        <TgMonitorSection accentValue={accentValue} />
               
               <FieldGroup.Section title="社区">
           <ListItem
