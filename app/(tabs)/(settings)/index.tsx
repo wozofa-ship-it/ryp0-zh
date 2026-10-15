@@ -11,6 +11,8 @@ import {
   AccentColor,
   AppearancePreference,
 } from '../../../theme/app-preferences';
+import TgMonitorSection from '../../../components/tg-monitor-section';
+
 
 const DISCORD_URL = 'https://discord.gg/6r2Eax4c5j';
 const YOUTUBE_URL = 'https://www.youtube.com/@ry0_Offical';
@@ -287,7 +289,9 @@ export default function Settings() {
           </ListItem>
         </FieldGroup.Section>
 
-        <FieldGroup.Section title="社区">
+        <TgMonitorSection accentValue={accentValue} />
+              
+              <FieldGroup.Section title="社区">
           <ListItem
             onPress={() => void handleOpenLink(DISCORD_URL, 'Discord')}
             leading={<SettingsSymbol name="message.fill" color={accentValue} />}
