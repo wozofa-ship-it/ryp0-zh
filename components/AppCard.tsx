@@ -21,7 +21,7 @@ import AppCardVisual from './app-card-visual';
 import { APP_CARD_HEIGHT } from './app-card-visual.types';
 import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/app-status';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
-import { useTranslatedText } from '../hooks/useTranslatedText';
+import { decodeDescription } from '../services/translate';
 
 
 interface AppCardProps {
@@ -49,7 +49,8 @@ function AppCardComponent({ app, drag, isActive, onOpen, onEdit, onDelete, onDup
   
   const latestVersionLabel = latestVersion?.version || 'Unavailable';
     const rawSubtitle = app.subtitle || app.localizedDescription || `${app.name} for iOS`;
-  const subtitle = useTranslatedText(rawSubtitle);
+    // 列表只解码 URL 编码，不做网络翻译（避免滚动卡顿）；详情页才翻译
+    const subtitle = decodeDescription(rawSubtitle);
   
   const theme = getAppCardTheme(app, index);
   const appStatus = getAppStatus(app, runtimeStatus ?? app.status);
