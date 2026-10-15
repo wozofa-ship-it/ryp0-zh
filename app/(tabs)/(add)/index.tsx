@@ -481,7 +481,7 @@ export default function AddAppTabScreen() {
                   });
                 },
               },
-              { text: 'OK', style: 'cancel' },
+              { text: '好', style: 'cancel' },
             ]
           : undefined,
       );
