@@ -8,6 +8,11 @@ import { installInLiveContainer } from '../services/livecontainer';
 import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/app-status';
 import { getAppGitHubProjectUrl } from '../services/app-project';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
+import { useTranslatedText } from '../hooks/useTranslatedText';
+import { useTranslatedText } from '../hooks/useTranslatedText';
+import { useTranslatedText } from '../hooks/useTranslatedText';
+import { useTranslatedText } from '../hooks/useTranslatedText';
+import { useTranslatedText } from '../hooks/useTranslatedText';
 
 interface AppDetailsProps {
   app: RepoApp;
@@ -29,6 +34,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
   const latestVersion = app.versions[0];
   const appStatus = getAppStatus(app, runtimeStatus ?? app.status);
   const githubProjectUrl = getAppGitHubProjectUrl(app);
+  const translatedDesc = useTranslatedText(app.localizedDescription || app.subtitle || 'No description has been provided for this app.');
 
   const handleInstall = async () => {
     try {
@@ -96,7 +102,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
             </FieldGroup.Section>
 
             <FieldGroup.Section title="描述">
-              <ListItem supportingText={app.localizedDescription || app.subtitle || 'No description has been provided for this app.'}>
+              <ListItem supportingText={translatedDesc}>
                 <Text>{app.subtitle || 'About this app'}</Text>
               </ListItem>
             </FieldGroup.Section>
