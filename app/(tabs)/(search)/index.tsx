@@ -168,10 +168,10 @@ export default function SearchScreen() {
           void commitAfterChange(`${newApp.name} was added to repo.json.`);
         }}
         onDelete={() => {
-          Alert.alert('删除应用', `Are you sure you want to delete ${item.name}?`, [
-            { text: 'Cancel', style: 'cancel' },
+          Alert.alert('删除应用', `确定要删除 ${item.name} 吗？`, [
+            { text: '取消', style: 'cancel' },
             {
-              text: 'Delete',
+              text: '删除',
               style: 'destructive',
               onPress: () => {
                 useRepoStore.getState().deleteApp(item.bundleIdentifier);
