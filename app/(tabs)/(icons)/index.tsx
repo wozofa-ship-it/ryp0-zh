@@ -158,9 +158,9 @@ export default function IconsGalleryScreen() {
       'Rename Icon',
       'Enter the label shown in this gallery. The published icon filename and URL stay unchanged.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
-          text: 'Save',
+          text: '保存',
           onPress: (value?: string) => { void saveDisplayName(item, value); },
         },
       ],
