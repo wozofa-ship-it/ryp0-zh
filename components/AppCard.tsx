@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+
 import {
   Alert,
   Linking,
@@ -20,6 +21,8 @@ import AppCardVisual from './app-card-visual';
 import { APP_CARD_HEIGHT } from './app-card-visual.types';
 import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/app-status';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
+import { useTranslatedText } from '../hooks/useTranslatedText';
+
 
 interface AppCardProps {
   app: RepoApp;
@@ -43,8 +46,11 @@ function AppCardComponent({ app, drag, isActive, onOpen, onEdit, onDelete, onDup
   const isOpeningRef = useRef(false);
   const openResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestVersion = app.versions?.[0];
+  
   const latestVersionLabel = latestVersion?.version || 'Unavailable';
-  const subtitle = app.subtitle || app.localizedDescription || `${app.name} for iOS`;
+    const rawSubtitle = app.subtitle || app.localizedDescription || `${app.name} for iOS`;
+  const subtitle = useTranslatedText(rawSubtitle);
+  
   const theme = getAppCardTheme(app, index);
   const appStatus = getAppStatus(app, runtimeStatus ?? app.status);
   const typeLabel = getAppUpdatePolicy(app) === 'daily' ? '每日更新' : '静态';
