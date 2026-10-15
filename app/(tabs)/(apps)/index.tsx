@@ -115,7 +115,7 @@ export default function HomeScreen() {
     if (!isDeveloperMode) {
       Alert.alert('需要验证', 'Please configure your GitHub PAT in Settings to commit changes.', [
         { text: 'Settings', onPress: () => router.push('/(tabs)/settings') },
-        { text: 'Cancel', style: 'cancel' }
+        { text: '取消', style: 'cancel' }
       ]);
       return;
     }
@@ -207,10 +207,10 @@ export default function HomeScreen() {
             }
           }}
           onDelete={() => {
-            Alert.alert('删除应用', `Are you sure you want to delete ${item.name}?`, [
-              { text: 'Cancel', style: 'cancel' },
+            Alert.alert('删除应用', `确定要删除 ${item.name} 吗？`, [
+              { text: '取消', style: 'cancel' },
               {
-                text: 'Delete',
+                text: '删除',
                 style: 'destructive',
                 onPress: () => {
                   useRepoStore.getState().deleteApp(item.bundleIdentifier);
