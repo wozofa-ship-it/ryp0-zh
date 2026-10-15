@@ -78,7 +78,7 @@ function AuthorizedAppRequestsScreen() {
     Alert.alert('批准此次导入？',
       `Suggested: ${methodLabel(suggested)}. ryP0 will queue a private import for ${request.name}. The app will not be published unless the importer validates its IPA and catalog data.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
           text: 'Approve & Queue',
           onPress: () => {
