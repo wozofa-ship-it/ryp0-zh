@@ -106,7 +106,7 @@ export default function Settings() {
     Alert.alert('退出开发者模式？',
       'This removes the stored developer credential from this device and returns the app to read-only mode.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: '取消', style: 'cancel' },
         {
           text: 'Sign Out',
           style: 'destructive',
