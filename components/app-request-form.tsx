@@ -8,10 +8,19 @@ import { scrollDisabled } from '@expo/ui/swift-ui/modifiers';
 import { getSafeExternalHttpsUrl } from '../services/safe-url';
 
 const METHOD_LABELS: Record<AppRequestMethod, string> = {
-  github: 'GitHub project or release',
-  repository: 'Another app repository',
-  'direct-url': 'Direct IPA download',
-  'telegram-r2': 'Telegram / R2 import',
+  github: 'GitHub 项目或 Release',
+  repository: '其他应用仓库',
+  'direct-url': 'IPA 直链下载',
+  'telegram-r2': 'Telegram / R2 导入',
+};
+
+const CATEGORY_LABELS: Record<(typeof REQUEST_CATEGORIES)[number], string> = {
+  Sideloading: '侧载应用',
+  Games: '游戏',
+  Social: '社交',
+  EMU: '模拟器',
+  Movies: '影视',
+  Tools: '工具',
 };
 
 const REQUEST_CATEGORIES = [
@@ -50,13 +59,13 @@ export default function AppRequestForm() {
     };
 
     if (!submission.name || !submission.description || !submission.category || !submission.sourceUrl) {
-      Alert.alert('完善请求', '需要填写名称、描述、分类和来源链接。');
+      Alert.alert('完善请求', '需要填写名称、描述、分类和来源链接。', [{ text: '好' }]);
       return;
     }
 
     const safeSourceUrl = getSafeExternalHttpsUrl(submission.sourceUrl);
     if (!safeSourceUrl) {
-      Alert.alert('使用安全的来源链接', '应用请求仅接受 HTTPS 链接。');
+      Alert.alert('使用安全的来源链接', '应用请求仅接受 HTTPS 链接。', [{ text: '好' }]);
       return;
     }
 
@@ -69,9 +78,13 @@ export default function AppRequestForm() {
       setCategory('Sideloading');
       sourceUrl.value = '';
       setMethod('github');
-      Alert.alert('请求已发送', '你的应用请求已发送给仓库开发者审核。');
+      Alert.alert('请求已发送', '你的应用请求已发送给仓库开发者审核。', [{ text: '好' }]);
     } catch (error: any) {
-      Alert.alert('无法发送请求', error?.message || 'Try again when you are connected.');
+      const msg = error?.message || '请检查网络连接后重试。';
+      const zhMsg = msg.includes('temporarily unavailable')
+        ? '应用请求功能暂不可用，私有审核服务尚未部署。'
+        : msg;
+      Alert.alert('无法发送请求', zhMsg, [{ text: '好' }]);
     } finally {
       submitLock.current = false;
       setIsSubmitting(false);
@@ -105,7 +118,7 @@ export default function AppRequestForm() {
                     appearance="menu"
                   >
                     {REQUEST_CATEGORIES.map((value) => (
-                      <Picker.Item key={value} value={value} label={value} />
+                      <Picker.Item key={value} value={value} label={CATEGORY_LABELS[value]} />
                     ))}
                   </Picker>
                 }
