@@ -9,10 +9,6 @@ import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/a
 import { getAppGitHubProjectUrl } from '../services/app-project';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
 import { useTranslatedText } from '../hooks/useTranslatedText';
-import { useTranslatedText } from '../hooks/useTranslatedText';
-import { useTranslatedText } from '../hooks/useTranslatedText';
-import { useTranslatedText } from '../hooks/useTranslatedText';
-import { useTranslatedText } from '../hooks/useTranslatedText';
 
 interface AppDetailsProps {
   app: RepoApp;
