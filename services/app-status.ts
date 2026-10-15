@@ -149,12 +149,12 @@ async function cancelResponseBody(response: Response): Promise<void> {
 
 async function checkDownload(downloadURL: string | undefined, signal?: AbortSignal): Promise<DownloadCheck> {
   if (!downloadURL) {
-    return { state: 'unavailable', message: 'No latest IPA download URL is configured.' };
+    return { state: 'unavailable', message: '未配置最新 IPA 下载链接。' };
   }
 
   const safeDownloadURL = getSafeExternalHttpsUrl(downloadURL);
   if (!safeDownloadURL) {
-    return { state: 'unavailable', message: 'The latest IPA download URL must use HTTPS.' };
+    return { state: 'unavailable', message: '最新 IPA 下载链接须使用 HTTPS。' };
   }
 
   try {
@@ -178,10 +178,10 @@ async function checkDownload(downloadURL: string | undefined, signal?: AbortSign
 
     return isAvailable
       ? { state: 'available' }
-      : { state: 'unavailable', message: `The latest IPA returned HTTP ${statusCode}.` };
+      : { state: 'unavailable', message: `最新 IPA 返回 HTTP ${statusCode}。` };
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw error;
-    return { state: 'unknown', message: 'The latest IPA could not be reached from this device.' };
+    return { state: 'unknown', message: '本设备无法访问最新 IPA。' };
   }
 }
 
@@ -217,7 +217,7 @@ async function verifyAppStatus(
       state: 'healthy',
       checkedDownloadURL,
       checkedAt,
-      message: 'The latest IPA responded successfully.',
+      message: '最新 IPA 响应正常。',
     };
   } else if (currentPersistedStatus) {
     // A temporary offline/device-network failure is inconclusive. Preserve a
@@ -279,7 +279,7 @@ export async function verifyRepositoryAppStatuses(
           state: 'unknown',
           checkedDownloadURL: app.versions[0]?.downloadURL ?? '',
           checkedAt: new Date().toISOString(),
-          message: 'The latest IPA could not be verified.',
+          message: '最新 IPA 无法验证。',
         };
         results[key] = status;
         options.onStatus?.({ key, app, status });

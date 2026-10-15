@@ -164,7 +164,7 @@ export default function AppRequestForm() {
 
             <FieldGroup.Section>
               <Button onPress={handleSubmit} disabled={isSubmitting}>
-                <Text>{isSubmitting ? 'Sending Request…' : 'Send App Request'}</Text>
+                <Text>{isSubmitting ? '发送中…' : '发送应用请求'}</Text>
               </Button>
             </FieldGroup.Section>
           </FieldGroup>
