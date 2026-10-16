@@ -41,7 +41,6 @@ import { installInLiveContainer } from '../services/livecontainer';
 import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/app-status';
 import { getAppGitHubProjectUrl } from '../services/app-project';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
-import { decodeDescription } from '../services/translate';
 
 const SECONDARY = { type: 'hierarchical', style: 'secondary' } as const;
 const TERTIARY = { type: 'hierarchical', style: 'tertiary' } as const;
@@ -70,26 +69,15 @@ function formatFileSize(size?: number) {
 }
 
 function formatReleaseDate(date?: string) {
-  if (!date) return '未知时间';
+  if (!date) return 'Release date unavailable';
 
   const parsedDate = new Date(date);
   if (Number.isNaN(parsedDate.getTime())) return date;
 
-  const y = parsedDate.getFullYear();
-  const m = parsedDate.getMonth() + 1;
-  const d = parsedDate.getDate();
-  let h = parsedDate.getHours();
-  const min = String(parsedDate.getMinutes()).padStart(2, '0');
-
-  // 中文时段：凌晨/上午/中午/下午/晚上
-  let period = '';
-  if (h < 6) period = '凌晨';
-  else if (h < 12) period = '上午';
-  else if (h < 14) period = '中午';
-  else if (h < 18) period = '下午';
-  else period = '晚上';
-
-  return `${y}年${m}月${d}日 ${period}${h}:${min}`;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(parsedDate);
 }
 
 function versionSummary(version: RepoVersion) {
@@ -109,7 +97,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
   const runtimeStatus = useRepoStore((state) => state.runtimeAppStatuses[getAppStatusKey(app)]);
   const latestVersion = app.versions[0];
   const appStatus = getAppStatus(app, runtimeStatus ?? app.status);
-  const appDescription = decodeDescription(app.localizedDescription || app.subtitle || '暂无此应用的描述。');
+  const appDescription = app.localizedDescription || app.subtitle || 'No description has been provided for this app.';
   const githubProjectUrl = getAppGitHubProjectUrl(app);
 
   const handleInstall = async () => {
@@ -232,15 +220,15 @@ export default function AppDetails({ app }: AppDetailsProps) {
                   {app.name}
                 </Text>
                 <Text modifiers={[font({ size: 15 }), foregroundStyle(SECONDARY), lineLimit(1), truncationMode('tail')]}>
-                  {app.developerName || '未知开发者'}
+                  {app.developerName || 'Unknown developer'}
                 </Text>
                 {latestVersion ? (
                   <VStack alignment="leading" spacing={1}>
                     <Text modifiers={[font({ size: 14 }), foregroundStyle(SECONDARY)]}>
-                      版本 {latestVersion.version}
+                      Version {latestVersion.version}
                     </Text>
                     <Text modifiers={[font({ size: 13 }), foregroundStyle(TERTIARY)]}>
-                      发布于 {formatReleaseDate(latestVersion.date)}
+                      Released {formatReleaseDate(latestVersion.date)}
                     </Text>
                   </VStack>
                 ) : null}
@@ -283,7 +271,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
           ) : null}
 
           <Section
-            header={sectionHeader('应用信息')}
+            header={sectionHeader('App Information')}
             modifiers={[listRowBackground(Color.ios.secondarySystemGroupedBackground)]}
           >
             <LabeledContent label="应用类型">
@@ -299,7 +287,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
             </LabeledContent>
             <Text modifiers={[font({ size: 13 }), foregroundStyle(SECONDARY)]}>
               {appStatus.message || appStatus.detail}
-              {appStatus.checkedAt ? ` · 检查于 ${formatReleaseDate(appStatus.checkedAt)}` : ''}
+              {appStatus.checkedAt ? ` · Checked ${formatReleaseDate(appStatus.checkedAt)}` : ''}
             </Text>
             <LabeledContent label="开发者">
               <Text modifiers={[foregroundStyle(SECONDARY), lineLimit(1), truncationMode('tail')]}>
@@ -327,14 +315,14 @@ export default function AppDetails({ app }: AppDetailsProps) {
           </Section>
 
           <Section
-            header={sectionHeader('描述')}
+            header={sectionHeader('Description')}
             modifiers={[listRowBackground(Color.ios.secondarySystemGroupedBackground)]}
           >
             <Text modifiers={[foregroundStyle(SECONDARY)]}>{appDescription}</Text>
           </Section>
 
           <Section
-            header={sectionHeader(`版本 (${app.versions.length})`)}
+            header={sectionHeader(`Versions (${app.versions.length})`)}
             modifiers={[listRowBackground(Color.ios.secondarySystemGroupedBackground)]}
           >
             {app.versions.length ? (
@@ -386,7 +374,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
 
           {app.appPermissions?.entitlements?.length || app.appPermissions?.privacy ? (
             <Section
-              header={sectionHeader('权限')}
+              header={sectionHeader('Permissions')}
               modifiers={[listRowBackground(Color.ios.secondarySystemGroupedBackground)]}
             >
               {app.appPermissions?.entitlements?.map((entitlement) => (

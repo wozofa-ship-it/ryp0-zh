@@ -12,6 +12,7 @@ import {
   AppearancePreference,
 } from '../../../theme/app-preferences';
 
+
 const DISCORD_URL = 'https://discord.gg/6r2Eax4c5j';
 const YOUTUBE_URL = 'https://www.youtube.com/@ry0_Offical';
 const OWNER_GITHUB_URL = `https://github.com/${ADMIN_GITHUB_LOGIN}`;
@@ -95,7 +96,7 @@ export default function Settings() {
       const account = await setGithubToken(submittedToken);
       token.value = '';
       Alert.alert('开发者模式已启用',
-        `已验证 @${account?.login ?? '你的账号'} 可管理 ryP0 目录、版本和私有自动化。`,
+        `GitHub verified @${account?.login ?? 'your account'} can manage the ryP0 catalog, releases, and private automation.`,
       );
     } catch (error: any) {
       Alert.alert('验证失败', error?.message || 'GitHub 无法验证此 Token。');
@@ -104,11 +105,11 @@ export default function Settings() {
 
   const handleSignOut = () => {
     Alert.alert('退出开发者模式？',
-      '这将从本设备移除已保存的开发者凭证，应用回到只读模式。',
+      'This removes the stored developer credential from this device and returns the app to read-only mode.',
       [
         { text: '取消', style: 'cancel' },
         {
-          text: '退出登录',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: () => {
             void setGithubToken('').then(() => {
@@ -127,17 +128,17 @@ export default function Settings() {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('无法打开链接', `${title} 在本设备上无法打开。`);
+      Alert.alert('无法打开链接', `${title} could not be opened on this device.`);
     }
   };
 
   const credentialProtectionText = credentialProtection?.protection === 'face-id'
-    ? 'Face ID 保护本设备保存的开发者 Token。'
+    ? 'Face ID protects this device’s saved developer token.'
     : credentialProtection?.protection === 'touch-id'
-      ? 'Touch ID 保护本设备保存的开发者 Token。'
+      ? 'Touch ID protects this device’s saved developer token.'
       : credentialProtection?.isExpoGo
-        ? '已存于 iOS 钥匙串。开发版或正式版构建中会启用 Face ID。'
-        : '已存于设备钥匙串。设置 Face ID 或 Touch ID 可添加生物识别保护。';
+        ? 'Stored in the iOS Keychain. Face ID activates in a development or production build.'
+        : 'Stored in the device Keychain. Set up Face ID or Touch ID to add biometric protection.';
   const accentValue = ACCENT_COLORS[accentColor].value;
   // Show the single supported owner account up front without implying that a
   // credential is already connected. A verified login replaces this label.
@@ -147,12 +148,12 @@ export default function Settings() {
   // repository access due to a capitalization difference in the API response.
   const isOwnerAccount = isAdminGitHubLogin(githubLogin);
   const accountDetail = isAuthenticating
-    ? '正在检查 GitHub 仓库权限…'
+    ? 'Checking GitHub repository access…'
     : isDeveloperMode
       ? isOwnerAccount
-        ? `${ADMIN_GITHUB_LOGIN} · 已验证仓库权限`
-        : '已验证仓库写入权限'
-      : `未连接 · 添加 ${ADMIN_GITHUB_LOGIN} 的 Token 以启用编辑`;
+        ? `${ADMIN_GITHUB_LOGIN} · verified repository access`
+        : 'Verified repository write access'
+      : `Not connected · add a ${ADMIN_GITHUB_LOGIN} token to enable edits`;
   const profileUrl = githubLogin ? `https://github.com/${githubLogin}` : OWNER_GITHUB_URL;
 
   return (
@@ -201,18 +202,18 @@ export default function Settings() {
           <FieldGroup.Section title="开发者权限">
             <ListItem
               leading={<SettingsSymbol name={isDeveloperMode ? 'checkmark.shield.fill' : 'shield.fill'} color={isDeveloperMode ? '#34C759' : accentValue} />}
-              supportingText={isDeveloperMode ? '本设备可使用编辑和工作流控制。' : '浏览、搜索和提交请求，无仓库写入权限。'}
+              supportingText={isDeveloperMode ? 'Editing and workflow controls are available on this device.' : 'Browse, search, and submit requests without repository write access.'}
             >
-              <Text>{isDeveloperMode ? '开发者模式已启用' : '普通模式（只读）'}</Text>
+              <Text>{isDeveloperMode ? 'Developer Mode is enabled' : 'Consumer Mode (read-only)'}</Text>
             </ListItem>
             <TextInput
               value={token}
               onChangeText={handleChangeText}
-              placeholder={hasGitHubCredential ? '输入替换的 GitHub Token' : '输入 Token'}
+              placeholder={hasGitHubCredential ? 'Enter a replacement GitHub token' : 'Enter Token'}
               secureTextEntry
             />
             <Button onPress={handleSave} disabled={isAuthenticating}>
-              <Text>{isAuthenticating ? '正在验证 GitHub…' : isDeveloperMode ? '验证并替换 Token' : '验证并启用开发者模式'}</Text>
+              <Text>{isAuthenticating ? 'Verifying GitHub…' : isDeveloperMode ? 'Validate & Replace Token' : 'Validate & Enable Developer Mode'}</Text>
             </Button>
             {isDeveloperMode ? (
               <Button onPress={handleSignOut} disabled={isAuthenticating}>
@@ -228,7 +229,7 @@ export default function Settings() {
           <FieldGroup.Section title="公开构建">
             <ListItem
               leading={<SettingsSymbol name="shield.fill" color={accentValue} />}
-              supportingText="此普通构建无法保存 GitHub 凭证或打开目录管理工具。"
+              supportingText="This consumer build cannot save GitHub credentials or open catalog-management tools."
             >
               <Text>只读目录访问</Text>
             </ListItem>
@@ -249,7 +250,7 @@ export default function Settings() {
               </ListItem>
               <ListItem
                 leading={<SettingsSymbol name="key.fill" color={accentValue} />}
-                supportingText="Token 仅存于钥匙串，不会写入 repo.json、AsyncStorage 或应用包。"
+                supportingText="The token stays in the Keychain and is never written to repo.json, AsyncStorage, or the app bundle."
               >
                 <Text>仅本地凭证</Text>
               </ListItem>
@@ -257,7 +258,7 @@ export default function Settings() {
           ) : (
             <ListItem
               leading={<SettingsSymbol name="shield.fill" color={accentValue} />}
-              supportingText="此构建不包含 GitHub、Telegram、R2、Cloudflare 或管理员凭证。"
+              supportingText="No GitHub, Telegram, R2, Cloudflare, or administrator credential is included in this build."
             >
               <Text>无凭证构建</Text>
             </ListItem>
@@ -287,7 +288,8 @@ export default function Settings() {
           </ListItem>
         </FieldGroup.Section>
 
-        <FieldGroup.Section title="社区">          <ListItem
+<FieldGroup.Section title="社区">
+          <ListItem
             onPress={() => void handleOpenLink(DISCORD_URL, 'Discord')}
             leading={<SettingsSymbol name="message.fill" color={accentValue} />}
             trailing={<DisclosureSymbol color={accentValue} />}
@@ -299,7 +301,7 @@ export default function Settings() {
             onPress={() => void handleOpenLink(YOUTUBE_URL, 'YouTube')}
             leading={<SettingsSymbol name="play.rectangle.fill" color={accentValue} />}
             trailing={<DisclosureSymbol color={accentValue} />}
-            supportingText="观看 ry0 官方更新"
+            supportingText="Watch updates from ry0 Official"
           >
             <Text>YouTube</Text>
           </ListItem>

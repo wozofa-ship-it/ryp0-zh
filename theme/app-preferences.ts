@@ -1,11 +1,11 @@
 import { useColorScheme } from 'react-native';
 
 export const ACCENT_COLORS = {
-  blue: { label: '蓝色', value: '#007AFF' },
-  purple: { label: '紫色', value: '#AF52DE' },
-  cyan: { label: '青色', value: '#32ADE6' },
-  red: { label: '红色', value: '#FF3B30' },
-  rose: { label: '玫红', value: '#FF2D55' },
+  blue: { label: 'Blue', value: '#007AFF' },
+  purple: { label: 'Purple', value: '#AF52DE' },
+  cyan: { label: 'Cyan', value: '#32ADE6' },
+  red: { label: 'Red', value: '#FF3B30' },
+  rose: { label: 'Rose', value: '#FF2D55' },
 } as const;
 
 export type AccentColor = keyof typeof ACCENT_COLORS;

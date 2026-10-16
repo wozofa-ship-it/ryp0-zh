@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Directory, Paths } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 
 export interface FavoriteApp {
   id: string;
@@ -17,19 +17,34 @@ export interface FavoriteApp {
 const STORAGE_KEY = 'ryp0_favorites_v1';
 const FAVORITES_DIR = 'favorites';
 
-/**
- * 确保收藏目录存在。注意：必须用 Directory 类，
- * new File(file实例, "名字") 不会拼接路径（文档：File 作首参表示引用同一文件）。
- */
-async function ensureDir(): Promise<Directory> {
-  const dir = new Directory(Paths.document, FAVORITES_DIR);
+async function ensureDir() {
+  const dir = new File(Paths.document, FAVORITES_DIR);
   if (!dir.exists) {
     dir.create({ intermediates: true });
   }
+  // 二次确认目录真实存在，避免下载时 move 失败
   if (!dir.exists) {
     throw new Error('无法创建收藏目录，请检查存储权限');
   }
   return dir;
+}
+
+/**
+ * 稳健下载：先下到缓存临时文件，再拷贝到目标位置。
+ * 直接 downloadFileAsync 到目标在某些机型上 move 会失败（见 2026-10-15 用户报错）。
+ */
+async function robustDownload(url: string, destFile: File): Promise<File> {
+  const tmpFile = new File(Paths.cache, `dl-${Date.now()}-${Math.floor(Math.random() * 100000)}.tmp`);
+  try {
+    await File.downloadFileAsync(url, tmpFile);
+    if (!tmpFile.exists) throw new Error('下载失败，文件为空');
+    // 拷贝到目标（destFile 的父目录已由 ensureDir 建好）
+    tmpFile.copy(destFile);
+    if (!destFile.exists) throw new Error('文件保存失败');
+    return destFile;
+  } finally {
+    try { if (tmpFile.exists) tmpFile.delete(); } catch { /* 忽略 */ }
+  }
 }
 
 function cleanName(filename: string): string {
@@ -101,11 +116,9 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
         continue;
       }
       const id = `fav-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      // dir 是 Directory，new File(dir, name) 会正确拼接路径
       const dest = new File(dir, `${id}.ipa`);
       const src = new File(asset.uri);
-      await src.copy(dest);
-      if (!dest.exists) throw new Error(`文件保存失败：${asset.name}`);
+      src.copy(dest);
       imported.push({
         id,
         name: cleanName(asset.name),
@@ -129,8 +142,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     const dir = await ensureDir();
     const id = `fav-${Date.now()}`;
     const dest = new File(dir, `${id}.ipa`);
-    const downloaded = await File.downloadFileAsync(clean, dest);
-    if (!downloaded.exists) throw new Error('下载失败，文件保存失败');
+    const downloaded = await robustDownload(clean, dest);
     const filename = name || clean.split('/').pop()?.split('?')[0] || `${id}.ipa`;
     const fav: FavoriteApp = {
       id,
@@ -165,7 +177,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     const fav = get().favorites.find(f => f.id === id);
     if (!fav) throw new Error('找不到该收藏');
     const file = new File(fav.fileUri);
-    if (!file.exists) throw new Error('IPA 文件已不存在，请重新导入');
+    if (!file.exists) throw new Error('IPA 文件已不存在');
     const Sharing = await import('expo-sharing');
     if (!(await Sharing.isAvailableAsync())) throw new Error('当前设备不支持分享');
     await Sharing.shareAsync(file.uri, {
@@ -185,8 +197,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     const dir = await ensureDir();
     const id = `fav-${Date.now()}`;
     const dest = new File(dir, `${id}.ipa`);
-    const downloaded = await File.downloadFileAsync(app.downloadURL, dest);
-    if (!downloaded.exists) throw new Error('下载失败，文件保存失败');
+    const downloaded = await robustDownload(app.downloadURL, dest);
     const fav: FavoriteApp = {
       id,
       name: app.name,
@@ -256,8 +267,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       try {
         const id = `fav-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
         const dest = new File(dir, `${id}.ipa`);
-        const downloaded = await File.downloadFileAsync(url, dest);
-        if (!downloaded.exists) continue;
+        const downloaded = await robustDownload(url, dest);
         const filename = name || url.split('/').pop()?.split('?')[0] || `${id}.ipa`;
         const fav: FavoriteApp = {
           id,
