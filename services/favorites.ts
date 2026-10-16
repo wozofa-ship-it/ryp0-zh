@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import * as DocumentPicker from 'expo-document-picker';
-import { File, Paths } from 'expo-file-system';
+import { File, Directory, Paths } from 'expo-file-system';
 
 export interface FavoriteApp {
   id: string;
@@ -17,8 +17,12 @@ export interface FavoriteApp {
 const STORAGE_KEY = 'ryp0_favorites_v1';
 const FAVORITES_DIR = 'favorites';
 
-async function ensureDir() {
-  const dir = new File(Paths.document, FAVORITES_DIR);
+/**
+ * 确保收藏目录存在。注意：必须用 Directory 类，
+ * new File(file实例, "名字") 不会拼接路径（文档：File 作首参表示引用同一文件）。
+ */
+async function ensureDir(): Promise<Directory> {
+  const dir = new Directory(Paths.document, FAVORITES_DIR);
   if (!dir.exists) {
     dir.create({ intermediates: true });
   }
@@ -39,7 +43,7 @@ async function robustDownload(url: string, destFile: File): Promise<File> {
     await File.downloadFileAsync(url, tmpFile);
     if (!tmpFile.exists) throw new Error('下载失败，文件为空');
     // 拷贝到目标（destFile 的父目录已由 ensureDir 建好）
-    tmpFile.copy(destFile);
+    await tmpFile.copy(destFile);
     if (!destFile.exists) throw new Error('文件保存失败');
     return destFile;
   } finally {
