@@ -28,6 +28,11 @@ workflows:
       - name: Build unsigned IPA
         script: |
           set -e
+          # 清 Metro/Expo 打包缓存，防止 JS bundle 用旧代码
+          rm -rf "$TMPDIR/metro-"* 2>/dev/null || true
+          rm -rf "$TMPDIR/haste-map-"* 2>/dev/null || true
+          rm -rf ~/.expo 2>/dev/null || true
+          echo "✓ 已清打包缓存"
           mkdir -p build
           echo "=== 可用 scheme ==="
           xcodebuild -workspace "$XCODE_WORKSPACE" -list
