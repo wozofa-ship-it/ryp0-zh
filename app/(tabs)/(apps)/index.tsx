@@ -348,7 +348,7 @@ export default function HomeScreen() {
                 if (!fav.bundleIdentifier || fav.bundleIdentifier.startsWith('local.favorite.')) continue;
                 const repoApp = repo.apps.find((a: any) => a.bundleIdentifier === fav.bundleIdentifier);
                 if (!repoApp) continue;
-                const latestVersion = repoApp.versions?.[0]?.version || repoApp.version;
+                const latestVersion = repoApp.versions?.[0]?.version ;
                 if (latestVersion && latestVersion !== fav.version) {
                   // 有更新，删除旧的，添加新的
                   await removeFavorite(fav.id);
@@ -356,7 +356,7 @@ export default function HomeScreen() {
                   await addRepoApp({
                     name: repoApp.name,
                     bundleIdentifier: repoApp.bundleIdentifier,
-                    version: latest?.version || repoApp.version || '',
+                    version: latest?.version ||  '',
                     downloadURL: latest?.downloadURL || '',
                     size: latest?.size,
                   });
