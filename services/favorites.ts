@@ -15,7 +15,7 @@ export interface FavoriteApp {
 }
 
 const STORAGE_KEY = 'ryp0_favorites_v1';
-const FAVORITES_DIR = 'favorites';
+const FAVORITES_DIR = 'favorites_data';
 
 /**
  * 确保收藏目录存在。注意：必须用 Directory 类，
