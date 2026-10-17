@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     name: Unsigned iPhone Release IPA
-    runs-on: macos-26
+    runs-on: macos-latest
     timeout-minutes: 90
     env:
       CI: '1'
