@@ -148,7 +148,8 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       size: downloaded.size ?? 0,
       importDate: new Date().toISOString(),
       sourceUrl: clean,
-      
+    };
+
     const list = [...get().favorites, fav];
     await persist(list);
     set({ favorites: list });
