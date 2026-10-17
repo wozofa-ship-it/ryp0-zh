@@ -41,16 +41,6 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
           text: '用 LiveContainer 安装',
           onPress: async () => {
             try {
-              // 有远程 URL 的收藏（从仓库加的/从链接导入的）直接跳 LiveContainer
-              if (app.sourceUrl && /^https?:\/\//i.test(app.sourceUrl)) {
-                const { Linking } = await import('react-native');
-                const isInstalled = await Linking.canOpenURL('livecontainer://install');
-                if (!isInstalled) {
-                  throw new Error('未安装 LiveContainer，请先安装。');
-                }
-                await Linking.openURL(`livecontainer://install?url=${encodeURIComponent(app.sourceUrl)}`);
-                return;
-              }
               // 本地文件走系统分享通道，用户在分享页选 LiveContainer
               const Sharing = await import('expo-sharing');
               if (!(await Sharing.isAvailableAsync())) {
