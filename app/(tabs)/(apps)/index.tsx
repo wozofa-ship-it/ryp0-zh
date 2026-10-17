@@ -27,8 +27,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ACCENT_COLORS, useAppTheme } from '../../../theme/app-preferences';
 
 const CATEGORIES = [
-  { id: 'all', label: '全部应用' },
   { id: 'favorites', label: '我的收藏' },
+  { id: 'all', label: '全部应用' },
   { id: 'sideloading', label: '侧载应用' },
   { id: 'games', label: '游戏' },
   { id: 'social', label: '社交' },
@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const toolbarThemeKey = colorScheme === 'dark' ? 'dark' : 'light';
 
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('favorites');
   const selectedCategoryRef = useRef(selectedCategory);
 
   // 我的收藏
