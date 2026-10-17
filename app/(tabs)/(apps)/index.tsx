@@ -86,6 +86,7 @@ export default function HomeScreen() {
   const importFromUrl = useFavoritesStore(s => s.importFromUrl);
   const importFromListFile = useFavoritesStore(s => s.importFromListFile);
   const exportToFile = useFavoritesStore(s => s.exportToFile);
+  const clearFavorites = useFavoritesStore(s => s.clear);
   const [importing, setImporting] = useState(false);
 
   useEffect(() => { void loadFavorites(); }, [loadFavorites]);
@@ -322,6 +323,24 @@ export default function HomeScreen() {
     }
   }, [importing, exportToFile]);
 
+  const handleClearFavorites = useCallback(() => {
+    if (!favorites.length) return;
+    Alert.alert('清空收藏', `确定要删除全部 ${favorites.length} 个收藏吗？本地 IPA 文件也会一并删除，该操作不可恢复。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '清空',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearFavorites();
+          } catch (e: any) {
+            Alert.alert('清空失败', e?.message || '无法清空收藏。');
+          }
+        },
+      },
+    ]);
+  }, [clearFavorites, favorites.length]);
+
   const isFavorites = selectedCategory === 'favorites';
 
   const favoritesHeader = useMemo(() => (
@@ -374,8 +393,18 @@ export default function HomeScreen() {
           <Text style={[styles.importBtnText, styles.importBtnTextSecondary]}>导出清单</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.importRow}>
+        <TouchableOpacity
+          onPress={handleClearFavorites}
+          disabled={importing || !favorites.length}
+          style={[styles.importBtn, styles.clearBtn, (importing || !favorites.length) && styles.importBtnDisabled]}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.importBtnText, styles.clearBtnText]}>清空收藏</Text>
+        </TouchableOpacity>
+      </View>
     </View>
-  ), [accentColor, favorites.length, handleCategorySelect, handleExport, handleImportFile, handleImportListFile, handleImportUrl, importing, selectedCategory, theme.secondaryLabel]);
+  ), [accentColor, favorites.length, handleCategorySelect, handleClearFavorites, handleExport, handleImportFile, handleImportListFile, handleImportUrl, importing, selectedCategory, theme.secondaryLabel]);
 
   const FavoritesEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -570,6 +599,12 @@ const styles = StyleSheet.create({
   },
   importBtnTextSecondary: {
     color: '#0A84FF',
+  },
+  clearBtn: {
+    backgroundColor: '#2C2C2E',
+  },
+  clearBtnText: {
+    color: '#FF453A',
   },
   emptyContainer: {
     alignItems: 'center',
