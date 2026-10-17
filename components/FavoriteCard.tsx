@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { FavoriteApp, useFavoritesStore } from '../services/favorites';
 
@@ -24,11 +25,39 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const handleInstall = useCallback(async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      await Linking.openURL(app.fileUri);
+      Alert.alert('安装', `如何安装「${app.name}」？`, [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '直接打开',
+          onPress: async () => {
+            try {
+              await Linking.openURL(app.fileUri);
+            } catch (e: any) {
+              Alert.alert('安装', e?.message || '无法打开本地 IPA 文件。');
+            }
+          },
+        },
+        {
+          text: '用 LiveContainer 安装',
+          onPress: async () => {
+            try {
+              const Sharing = await import('expo-sharing');
+              if (!(await Sharing.isAvailableAsync())) {
+                throw new Error('当前设备不支持分享');
+              }
+              await Sharing.shareAsync(app.fileUri, {
+                dialogTitle: `用 LiveContainer 安装 ${app.name}`,
+              });
+            } catch (e: any) {
+              Alert.alert('LiveContainer 安装', e?.message || '无法分享到 LiveContainer，请确认已安装 LiveContainer。');
+            }
+          },
+        },
+      ]);
     } catch (e: any) {
       Alert.alert('安装', e?.message || '无法打开本地 IPA 文件。');
     }
-  }, [app.fileUri]);
+  }, [app.fileUri, app.name]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -60,6 +89,13 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
 
   return (
     <View style={styles.card}>
+      {app.iconUri ? (
+        <Image source={{ uri: app.iconUri }} style={styles.icon} contentFit='cover' />
+      ) : (
+        <View style={[styles.icon, styles.iconPlaceholder]}>
+          <Text style={styles.iconPlaceholderText}>{(app.name || '?').charAt(0).toUpperCase()}</Text>
+        </View>
+      )}
       <View style={styles.info}>
         <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
         <Text style={styles.meta} numberOfLines={1}>
@@ -96,6 +132,9 @@ const styles = {
     marginVertical: 7,
   },
   info: { flex: 1, marginRight: 10 },
+  icon: { width: 48, height: 48, borderRadius: 10, marginRight: 10 },
+  iconPlaceholder: { backgroundColor: '#2C2C2E', alignItems: 'center' as const, justifyContent: 'center' as const },
+  iconPlaceholderText: { color: '#8E8E93', fontSize: 20, fontWeight: '600' as const },
   name: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' as const },
   meta: { color: '#8E8E93', fontSize: 13, marginTop: 4 },
   bundle: { color: '#636366', fontSize: 11, marginTop: 2 },
