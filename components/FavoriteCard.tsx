@@ -25,7 +25,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const handleInstall = useCallback(async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      Alert.alert('安装', `如何安装「${app.name}」？`, [
+      Alert.alert('安装', `如何安装「${app.name}」?`, [
         { text: '取消', style: 'cancel' },
         {
           text: '直接打开',
@@ -41,6 +41,17 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
           text: '用 LiveContainer 安装',
           onPress: async () => {
             try {
+              // 有远程 URL 的收藏（从仓库加的/从链接导入的）直接跳 LiveContainer
+              if (app.sourceUrl && /^https?:\/\//i.test(app.sourceUrl)) {
+                const { Linking } = await import('react-native');
+                const isInstalled = await Linking.canOpenURL('livecontainer://install');
+                if (!isInstalled) {
+                  throw new Error('未安装 LiveContainer，请先安装。');
+                }
+                await Linking.openURL(`livecontainer://install?url=${encodeURIComponent(app.sourceUrl)}`);
+                return;
+              }
+              // 本地文件走系统分享通道，用户在分享页选 LiveContainer
               const Sharing = await import('expo-sharing');
               if (!(await Sharing.isAvailableAsync())) {
                 throw new Error('当前设备不支持分享');
@@ -78,7 +89,6 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
     Alert.prompt('重命名', '输入新的应用名称', [
       { text: '取消', style: 'cancel' },
       {
-        text: '确定',
         onPress: (name?: string) => {
           const n = (name || '').trim();
           if (n) rename(app.id, n);
@@ -143,7 +153,6 @@ const styles = {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    alignItems: 'center' as const,
   },
   installBtn: { backgroundColor: '#0A84FF' },
   installText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' as const },
