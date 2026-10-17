@@ -2,9 +2,7 @@
   "name": "ryp0",
   "version": "1.0.0",
   "main": "expo-router/entry",
-  "overrides": {
-    "lightningcss": "1.30.1"
-  },
+  "overrides": { "lightningcss": "1.30.1" },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",
     "@expo/ui": "~57.0.19",
@@ -35,6 +33,7 @@
     "expo-sharing": "^57.0.23",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
+    "jszip": "^3.10.2",
     "lucide-react-native": "^1.37.0",
     "nativewind": "5.0.0-preview.2",
     "react": "19.2.3",
