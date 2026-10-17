@@ -2,7 +2,9 @@ import React, { useCallback } from 'react';
 import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { FavoriteApp, useFavoritesStore } from '../services/favorites';
+import { useRepoStore } from '../store/useRepoStore';
 
 function formatSize(bytes: number): string {
   if (!bytes) return '';
@@ -18,9 +20,11 @@ function formatDate(iso: string): string {
 }
 
 export default function FavoriteCard({ app }: { app: FavoriteApp }) {
+  const router = useRouter();
   const remove = useFavoritesStore(s => s.remove);
   const rename = useFavoritesStore(s => s.rename);
   const shareIpa = useFavoritesStore(s => s.shareIpa);
+  const repoApps = useRepoStore(s => s.repo?.apps);
 
   const handleInstall = useCallback(async () => {
     try {
@@ -88,37 +92,59 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
     ], 'plain-text', app.name);
   }, [app.id, app.name, rename]);
 
+  const handleOpenDetails = useCallback(() => {
+    const apps = repoApps || [];
+    // 收藏的下载链接对应 FavoriteApp.sourceUrl；优先用它在仓库中找到对应应用，其次用 bundleIdentifier 匹配
+    const matched = app.sourceUrl
+      ? apps.find(a =>
+          a.bundleIdentifier === app.bundleIdentifier ||
+          (a.versions || []).some(v => v.downloadURL === app.sourceUrl)
+        )
+      : apps.find(a => a.bundleIdentifier === app.bundleIdentifier);
+    if (matched) {
+      router.push({
+        pathname: '/(tabs)/(apps)/[bundleIdentifier]',
+        params: { bundleIdentifier: matched.bundleIdentifier },
+      });
+      return;
+    }
+    const sizeText = app.size ? formatSize(app.size) : '未知';
+    Alert.alert('应用详情', '名称：' + app.name + '\n版本：' + (app.version || '未知') + '\n链接：' + (app.sourceUrl || '无') + '\n大小：' + sizeText);
+  }, [app, repoApps, router]);
+
   return (
-    <View style={styles.card}>
-      {app.iconUri ? (
-        <Image source={{ uri: app.iconUri }} style={styles.icon} contentFit='cover' />
-      ) : (
-        <View style={[styles.icon, styles.iconPlaceholder]}>
-          <Text style={styles.iconPlaceholderText}>{(app.name || '?').charAt(0).toUpperCase()}</Text>
+    <TouchableOpacity onPress={handleOpenDetails} activeOpacity={0.85}>
+      <View style={styles.card}>
+        {app.iconUri ? (
+          <Image source={{ uri: app.iconUri }} style={styles.icon} contentFit='cover' />
+        ) : (
+          <View style={[styles.icon, styles.iconPlaceholder]}>
+            <Text style={styles.iconPlaceholderText}>{(app.name || '?').charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {app.version}{app.size ? ` · ${formatSize(app.size)}` : ''}{app.importDate ? ` · ${formatDate(app.importDate)}` : ''}
+          </Text>
+          <Text style={styles.bundle} numberOfLines={1}>{app.bundleIdentifier}</Text>
         </View>
-      )}
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {app.version}{app.size ? ` · ${formatSize(app.size)}` : ''}{app.importDate ? ` · ${formatDate(app.importDate)}` : ''}
-        </Text>
-        <Text style={styles.bundle} numberOfLines={1}>{app.bundleIdentifier}</Text>
+        <View style={styles.actions}>
+          <TouchableOpacity onPress={handleInstall} style={[styles.btn, styles.installBtn]} activeOpacity={0.8}>
+            <Text style={styles.installText}>安装</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={styles.smallText}>分享</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleRename} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={styles.smallText}>改名</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={[styles.smallText, styles.deleteText]}>删除</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={handleInstall} style={[styles.btn, styles.installBtn]} activeOpacity={0.8}>
-          <Text style={styles.installText}>安装</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleShare} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={styles.smallText}>分享</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRename} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={styles.smallText}>改名</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleDelete} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={[styles.smallText, styles.deleteText]}>删除</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
