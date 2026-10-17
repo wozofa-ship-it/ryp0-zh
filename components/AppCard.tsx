@@ -227,6 +227,7 @@ function AppCardComponent({ app, drag, isActive, onOpen, onEdit, onDelete, onDup
               version: latestVersion.version,
               downloadURL: latestVersion.downloadURL,
               size: latestVersion.size,
+              iconURL: app.iconURL,
             });
             Alert.alert('已收藏', `「${fav?.name}」已加入我的收藏。`);
           } catch (e: any) {
