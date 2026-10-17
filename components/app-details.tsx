@@ -75,20 +75,22 @@ export default function AppDetails({ app }: AppDetailsProps) {
 
   const handleFavorite = async () => {
     try {
-      const addRepoApp = useFavoritesStore.getState().addRepoApp;
+      const store = useFavoritesStore.getState();
+      // 先检查是否已收藏，避免重复
+      const already = store.favorites.find(f => f.bundleIdentifier === app.bundleIdentifier);
+      if (already) {
+        Alert.alert('已收藏', `「${app.name}」已在我的收藏中。`);
+        return;
+      }
       const latest = latestVersion || app.versions[0];
-      const result = await addRepoApp({
+      await store.addRepoApp({
         name: app.name,
         bundleIdentifier: app.bundleIdentifier,
         version: latest?.version || app.version || '',
         downloadURL: latest?.downloadURL || '',
         size: latest?.size,
       });
-      if (result) {
-        Alert.alert('已收藏', `「${app.name}」已加入我的收藏。`);
-      } else {
-        Alert.alert('收藏', '已在收藏中。');
-      }
+      Alert.alert('已收藏', `「${app.name}」已加入我的收藏。`);
     } catch (e: any) {
       Alert.alert('收藏失败', e?.message || '无法收藏');
     }
