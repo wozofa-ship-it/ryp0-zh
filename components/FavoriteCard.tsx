@@ -22,6 +22,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const remove = useFavoritesStore(s => s.remove);
   const rename = useFavoritesStore(s => s.rename);
   const shareIpa = useFavoritesStore(s => s.shareIpa);
+  const router = useRouter();
 
   const handleUpdate = useCallback(async () => {
     // 检查更新：如果是从仓库收藏的，对比仓库最新版本
@@ -45,7 +46,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
         Alert.alert('更新', '仓库中已无此应用。');
         return;
       }
-      const latestVersion = repoApp.versions?.[0]?.version || repoApp.version;
+      const latestVersion = repoApp.versions?.[0]?.version;
       if (latestVersion && latestVersion !== app.version) {
         Alert.alert(
           '发现新版本',
@@ -62,7 +63,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
                 await useFavoritesStore.getState().addRepoApp({
                   name: repoApp.name,
                   bundleIdentifier: repoApp.bundleIdentifier,
-                  version: latest?.version || repoApp.version || '',
+                  version: latest?.version || '',
                   downloadURL: latest?.downloadURL || '',
                   size: latest?.size,
                 });
