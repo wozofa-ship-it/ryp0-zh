@@ -24,6 +24,11 @@ const FAVORITES_DIR = 'favorites';
 async function ensureDir(): Promise<Directory> {
   const dir = new Directory(Paths.document, FAVORITES_DIR);
   if (!dir.exists) {
+    // 旧版本 bug 可能留了个同名文件在那，先删掉再建目录
+    const staleFile = new File(Paths.document, FAVORITES_DIR);
+    if (staleFile.exists) {
+      staleFile.delete();
+    }
     dir.create({ intermediates: true });
   }
   // 二次确认目录真实存在，避免下载时 move 失败
