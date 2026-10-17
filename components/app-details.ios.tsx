@@ -165,13 +165,26 @@ export default function AppDetails({ app }: AppDetailsProps) {
         return;
       }
       const latest = latestVersion || app.versions[0];
-      await store.addRepoApp({
-        name: app.name,
-        bundleIdentifier: app.bundleIdentifier,
-        version: latest?.version || '',
-        downloadURL: latest?.downloadURL || '',
-        size: latest?.size,
-      });
+      const downloadURL = latest?.downloadURL || '';
+      if (!/^https?:\/\//i.test(downloadURL)) {
+        Alert.alert('无法收藏', '该应用没有有效的 IPA 下载链接');
+        return;
+      }
+      Alert.alert('正在收藏', `正在下载「${app.name}」，请稍候…`);
+      // 60秒超时，防止卡死
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('下载超时，请检查网络后重试')), 60000)
+      );
+      await Promise.race([
+        store.addRepoApp({
+          name: app.name,
+          bundleIdentifier: app.bundleIdentifier,
+          version: latest?.version || '',
+          downloadURL,
+          size: latest?.size,
+        }),
+        timeout,
+      ]);
       Alert.alert('已收藏', `「${app.name}」已加入我的收藏。`);
     } catch (e: any) {
       Alert.alert('收藏失败', e?.message || '无法收藏');
