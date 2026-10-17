@@ -27,8 +27,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ACCENT_COLORS, useAppTheme } from '../../../theme/app-preferences';
 
 const CATEGORIES = [
-  { id: 'favorites', label: '我的收藏' },
   { id: 'all', label: '全部应用' },
+  { id: 'favorites', label: '我的收藏' },
   { id: 'sideloading', label: '侧载应用' },
   { id: 'games', label: '游戏' },
   { id: 'social', label: '社交' },
@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const toolbarThemeKey = colorScheme === 'dark' ? 'dark' : 'light';
 
-  const [selectedCategory, setSelectedCategory] = useState('favorites');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const selectedCategoryRef = useRef(selectedCategory);
 
   // 我的收藏
@@ -86,7 +86,8 @@ export default function HomeScreen() {
   const importFromUrl = useFavoritesStore(s => s.importFromUrl);
   const importFromListFile = useFavoritesStore(s => s.importFromListFile);
   const exportToFile = useFavoritesStore(s => s.exportToFile);
-  const clearFavorites = useFavoritesStore(s => s.clear);
+  const removeFavorite = useFavoritesStore(s => s.remove);
+  const addRepoApp = useFavoritesStore(s => s.addRepoApp);
   const [importing, setImporting] = useState(false);
 
   useEffect(() => { void loadFavorites(); }, [loadFavorites]);
@@ -323,23 +324,58 @@ export default function HomeScreen() {
     }
   }, [importing, exportToFile]);
 
-  const handleClearFavorites = useCallback(() => {
-    if (!favorites.length) return;
-    Alert.alert('清空收藏', `确定要删除全部 ${favorites.length} 个收藏吗？本地 IPA 文件也会一并删除，该操作不可恢复。`, [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '清空',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await clearFavorites();
-          } catch (e: any) {
-            Alert.alert('清空失败', e?.message || '无法清空收藏。');
-          }
+  const handleUpdateAll = useCallback(async () => {
+    if (importing || !favorites.length) return;
+    Alert.alert(
+      '更新全部',
+      `检查 ${favorites.length} 个收藏的更新？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '检查',
+          onPress: async () => {
+            setImporting(true);
+            try {
+              const { useRepoStore } = await import('../../../store/useRepoStore');
+              const repo = useRepoStore.getState().repo;
+              if (!repo) {
+                Alert.alert('更新', '仓库数据未加载，请先到"全部应用"页刷新。');
+                return;
+              }
+              let updated = 0;
+              let upToDate = 0;
+              for (const fav of favorites) {
+                if (!fav.bundleIdentifier || fav.bundleIdentifier.startsWith('local.favorite.')) continue;
+                const repoApp = repo.apps.find((a: any) => a.bundleIdentifier === fav.bundleIdentifier);
+                if (!repoApp) continue;
+                const latestVersion = repoApp.versions?.[0]?.version || repoApp.version;
+                if (latestVersion && latestVersion !== fav.version) {
+                  // 有更新，删除旧的，添加新的
+                  await removeFavorite(fav.id);
+                  const latest = repoApp.versions?.[0];
+                  await addRepoApp({
+                    name: repoApp.name,
+                    bundleIdentifier: repoApp.bundleIdentifier,
+                    version: latest?.version || repoApp.version || '',
+                    downloadURL: latest?.downloadURL || '',
+                    size: latest?.size,
+                  });
+                  updated++;
+                } else {
+                  upToDate++;
+                }
+              }
+              Alert.alert('更新完成', `已更新 ${updated} 个，${upToDate} 个已是最新。`);
+            } catch (e: any) {
+              Alert.alert('更新失败', e?.message || '检查更新时出错');
+            } finally {
+              setImporting(false);
+            }
+          },
         },
-      },
-    ]);
-  }, [clearFavorites, favorites.length]);
+      ]
+    );
+  }, [importing, favorites, removeFavorite, addRepoApp]);
 
   const isFavorites = selectedCategory === 'favorites';
 
@@ -395,16 +431,16 @@ export default function HomeScreen() {
       </View>
       <View style={styles.importRow}>
         <TouchableOpacity
-          onPress={handleClearFavorites}
+          onPress={handleUpdateAll}
           disabled={importing || !favorites.length}
-          style={[styles.importBtn, styles.clearBtn, (importing || !favorites.length) && styles.importBtnDisabled]}
+          style={[styles.importBtn, styles.importBtnSecondary, (importing || !favorites.length) && styles.importBtnDisabled]}
           activeOpacity={0.8}
         >
-          <Text style={[styles.importBtnText, styles.clearBtnText]}>清空收藏</Text>
+          <Text style={[styles.importBtnText, styles.importBtnTextSecondary]}>更新全部</Text>
         </TouchableOpacity>
       </View>
     </View>
-  ), [accentColor, favorites.length, handleCategorySelect, handleClearFavorites, handleExport, handleImportFile, handleImportListFile, handleImportUrl, importing, selectedCategory, theme.secondaryLabel]);
+  ), [accentColor, favorites.length, handleCategorySelect, handleExport, handleImportFile, handleImportListFile, handleImportUrl, handleUpdateAll, importing, selectedCategory, theme.secondaryLabel]);
 
   const FavoritesEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -599,12 +635,6 @@ const styles = StyleSheet.create({
   },
   importBtnTextSecondary: {
     color: '#0A84FF',
-  },
-  clearBtn: {
-    backgroundColor: '#2C2C2E',
-  },
-  clearBtnText: {
-    color: '#FF453A',
   },
   emptyContainer: {
     alignItems: 'center',
