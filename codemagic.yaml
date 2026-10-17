@@ -33,6 +33,9 @@ workflows:
           rm -rf "$TMPDIR/haste-map-"* 2>/dev/null || true
           rm -rf ~/.expo 2>/dev/null || true
           echo "✓ 已清打包缓存"
+          # 清 Xcode DerivedData，防止增量编译用旧代码（#18-#22 包无中文的根因）
+          rm -rf ~/Library/Developer/Xcode/DerivedData 2>/dev/null || true
+          echo "✓ 已清 DerivedData"
           mkdir -p build
           echo "=== 可用 scheme ==="
           xcodebuild -workspace "$XCODE_WORKSPACE" -list
