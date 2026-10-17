@@ -206,13 +206,14 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     if (!list.length) throw new Error('收藏是空的，没有可导出的');
     const lines = [
       `# ryP0 我的收藏 (${new Date().toISOString().slice(0, 10)})`,
-      `# 格式：名称|版本|链接（# 开头为注释）`,
+      `# 格式：名称|版本|链接|图标URL（# 开头为注释）`,
     ];
     for (const f of list) {
       const name = f.name.replace(/\|/g, ' ');
       const ver = (f.version || '').replace(/\|/g, '');
       const url = (f.sourceUrl || '').replace(/\|/g, '');
-      lines.push(`${name}|${ver}|${url}`);
+      const icon = (f.iconUri || '').replace(/\|/g, '');
+      lines.push(`${name}|${ver}|${url}|${icon}`);
     }
     const dir = await ensureDir();
     const file = new File(dir, `ryp0-favorites-${Date.now()}.txt`);
@@ -235,11 +236,8 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     for (const rawLine of text.split('\n')) {
       const line = rawLine.trim();
       if (!line || line.startsWith('#')) continue;
-      const parts = line.split('|').map(p => p.trim());
-      const url = parts[parts.length - 1];
-      if (!/^https?:\/\//i.test(url)) continue;
-      const name = parts.length >= 3 ? parts.slice(0, -2).join('|') : undefined;
-      const version = parts.length >= 3 ? parts[parts.length - 2] : undefined;
+      const [name, version, url, iconUri] = line.split('|').map(p => p.trim());
+      if (!url || !/^https?:\/\//i.test(url)) continue;
       try {
         const id = `fav-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
         const dest = new File(dir, `${id}.ipa`);
@@ -254,6 +252,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
           size: downloaded.size ?? 0,
           importDate: new Date().toISOString(),
           sourceUrl: url,
+          ...(iconUri ? { iconUri } : {}),
         };
         const list = [...get().favorites, fav];
         await persist(list);
