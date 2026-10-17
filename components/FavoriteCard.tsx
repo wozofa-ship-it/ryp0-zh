@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
-import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { FavoriteApp, useFavoritesStore } from '../services/favorites';
 
 function formatSize(bytes: number): string {
@@ -21,7 +21,11 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const remove = useFavoritesStore(s => s.remove);
   const rename = useFavoritesStore(s => s.rename);
   const shareIpa = useFavoritesStore(s => s.shareIpa);
+  const router = useRouter();
 
+  const handleOpenDetails = useCallback(() => {
+    router.push(`/app-details?id=${app.id}&from=favorites`);
+  }, [app.id, router]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -52,33 +56,35 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   }, [app.id, app.name, rename]);
 
   return (
-    <View style={styles.card}>
-      {app.iconUri ? (
-        <Image source={{ uri: app.iconUri }} style={styles.icon} contentFit="cover" />
-      ) : (
-        <View style={[styles.icon, styles.iconPlaceholder]}>
-          <Text style={styles.iconPlaceholderText}>{(app.name || '?').charAt(0).toUpperCase()}</Text>
+    <TouchableOpacity onPress={handleOpenDetails} activeOpacity={0.9}>
+      <View style={styles.card}>
+        {app.iconUri ? (
+          <Image source={{ uri: app.iconUri }} style={styles.icon} contentFit="cover" />
+        ) : (
+          <View style={[styles.icon, styles.iconPlaceholder]}>
+            <Text style={styles.iconPlaceholderText}>{(app.name || '?').charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {app.version}{app.size ? ` · ${formatSize(app.size)}` : ''}{app.importDate ? ` · ${formatDate(app.importDate)}` : ''}
+          </Text>
+          <Text style={styles.bundle} numberOfLines={1}>{app.bundleIdentifier}</Text>
         </View>
-      )}
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {app.version}{app.size ? ` · ${formatSize(app.size)}` : ''}{app.importDate ? ` · ${formatDate(app.importDate)}` : ''}
-        </Text>
-        <Text style={styles.bundle} numberOfLines={1}>{app.bundleIdentifier}</Text>
+        <View style={styles.actions}>
+          <TouchableOpacity onPress={handleShare} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={styles.smallText}>分享</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleRename} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={styles.smallText}>改名</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={[styles.smallText, styles.deleteText]}>删除</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity onPress={handleShare} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={styles.smallText}>分享</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleRename} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={styles.smallText}>改名</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleDelete} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
-          <Text style={[styles.smallText, styles.deleteText]}>删除</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -106,8 +112,6 @@ const styles = {
     borderRadius: 20,
     alignItems: 'center' as const,
   },
-  installBtn: { backgroundColor: '#0A84FF' },
-  installText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' as const },
   smallBtn: { backgroundColor: '#2C2C2E', paddingHorizontal: 12, paddingVertical: 5 },
   smallText: { color: '#8E8E93', fontSize: 12 },
   deleteText: { color: '#FF453A' },
