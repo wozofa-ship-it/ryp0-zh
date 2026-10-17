@@ -9,6 +9,7 @@ import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/a
 import { getAppGitHubProjectUrl } from '../services/app-project';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
 import { useTranslatedText } from '../hooks/useTranslatedText';
+import { useFavoritesStore } from '../services/favorites';
 
 interface AppDetailsProps {
   app: RepoApp;
@@ -72,6 +73,27 @@ export default function AppDetails({ app }: AppDetailsProps) {
     }
   };
 
+  const handleFavorite = async () => {
+    try {
+      const addRepoApp = useFavoritesStore.getState().addRepoApp;
+      const latest = latestVersion || app.versions[0];
+      const result = await addRepoApp({
+        name: app.name,
+        bundleIdentifier: app.bundleIdentifier,
+        version: latest?.version || app.version || '',
+        downloadURL: latest?.downloadURL || '',
+        size: latest?.size,
+      });
+      if (result) {
+        Alert.alert('已收藏', `「${app.name}」已加入我的收藏。`);
+      } else {
+        Alert.alert('收藏', '已在收藏中。');
+      }
+    } catch (e: any) {
+      Alert.alert('收藏失败', e?.message || '无法收藏');
+    }
+  };
+
   return (
     <>
       <Stack.Screen options={{ title: app.name, headerLargeTitle: false, headerLargeTitleEnabled: false }} />
@@ -120,6 +142,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
               <Button onPress={handleInstall}><Text>安装最新版本</Text></Button>
               {latestVersion ? <Button onPress={() => void handleInstallInLiveContainer()}><Text>在 LiveContainer 中安装</Text></Button> : null}
               {githubProjectUrl ? <Button onPress={() => void handleOpenGitHub()}><Text>在 GitHub 查看</Text></Button> : null}
+              <Button onPress={() => void handleFavorite()}><Text>收藏应用</Text></Button>
               {isDeveloperMode ? (
                 <Button onPress={() => router.push({ pathname: '/edit', params: { bundleIdentifier: app.bundleIdentifier } })} variant="text">
                   <Text>编辑应用</Text>
