@@ -123,7 +123,9 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
         fileUri: dest.uri,
         size: asset.size ?? dest.size ?? 0,
         importDate: new Date().toISOString(),
-            if (!imported.length) throw new Error('所选文件中没有 .ipa');
+      });
+    }
+    if (!imported.length) throw new Error('所选文件中没有 .ipa');
     const list = [...get().favorites, ...imported];
     await persist(list);
     set({ favorites: list });
