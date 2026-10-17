@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import AppDetails from '../../../components/app-details';
 import { useRepoStore } from '../../../store/useRepoStore';
+import { useFavoritesStore } from '../../../services/favorites';
 import { useAppTheme } from '../../../theme/app-preferences';
 
 export default function AppDetailsScreen() {
@@ -10,6 +11,7 @@ export default function AppDetailsScreen() {
   const repo = useRepoStore((state) => state.repo);
   const fetchRepo = useRepoStore((state) => state.fetchRepo);
   const isLoading = useRepoStore((state) => state.isLoading);
+  const favorites = useFavoritesStore((state) => state.favorites);
   const theme = useAppTheme();
 
   useEffect(() => {
@@ -22,6 +24,29 @@ export default function AppDetailsScreen() {
 
   if (app) {
     return <AppDetails app={app} />;
+  }
+
+  // 收藏的本地应用：构造一个 RepoApp 兼容对象，走同一套详情页 UI
+  const fav = favorites.find((f) => f.bundleIdentifier === bundleIdentifier);
+  if (fav) {
+    const repoAppLike: any = {
+      name: fav.name,
+      bundleIdentifier: fav.bundleIdentifier,
+      developerName: '',
+      subtitle: '',
+      localizedDescription: '',
+      iconURL: fav.iconUri || '',
+      version: fav.version || '',
+      versions: [
+        {
+          version: fav.version || '',
+          date: fav.importDate || '',
+          size: fav.size || 0,
+          downloadURL: fav.sourceUrl || fav.fileUri || '',
+        },
+      ],
+    };
+    return <AppDetails app={repoAppLike} />;
   }
 
   return (
