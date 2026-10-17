@@ -41,6 +41,7 @@ import { installInLiveContainer } from '../services/livecontainer';
 import { getAppStatus, getAppStatusKey, getAppUpdatePolicy } from '../services/app-status';
 import { getAppGitHubProjectUrl } from '../services/app-project';
 import { requireSafeExternalHttpsUrl } from '../services/safe-url';
+import { useFavoritesStore } from '../services/favorites';
 
 const SECONDARY = { type: 'hierarchical', style: 'secondary' } as const;
 const TERTIARY = { type: 'hierarchical', style: 'tertiary' } as const;
@@ -154,6 +155,29 @@ export default function AppDetails({ app }: AppDetailsProps) {
     }
   };
 
+  const handleFavorite = async () => {
+    try {
+      await Haptics.selectionAsync();
+      const store = useFavoritesStore.getState();
+      const already = store.favorites.find((f) => f.bundleIdentifier === app.bundleIdentifier);
+      if (already) {
+        Alert.alert('已收藏', `「${app.name}」已在我的收藏中。`);
+        return;
+      }
+      const latest = latestVersion || app.versions[0];
+      await store.addRepoApp({
+        name: app.name,
+        bundleIdentifier: app.bundleIdentifier,
+        version: latest?.version || '',
+        downloadURL: latest?.downloadURL || '',
+        size: latest?.size,
+      });
+      Alert.alert('已收藏', `「${app.name}」已加入我的收藏。`);
+    } catch (e: any) {
+      Alert.alert('收藏失败', e?.message || '无法收藏');
+    }
+  };
+
   const handleEdit = () => {
     router.push({ pathname: '/edit', params: { bundleIdentifier: app.bundleIdentifier } });
   };
@@ -261,6 +285,12 @@ export default function AppDetails({ app }: AppDetailsProps) {
                     label="在 LiveContainer 中安装"
                     systemImage="shippingbox.fill"
                     onPress={() => void handleInstallInLiveContainer(latestVersion)}
+                    modifiers={[buttonStyle('bordered')]}
+                  />
+                  <Button
+                    label="收藏应用"
+                    systemImage="star"
+                    onPress={() => void handleFavorite()}
                     modifiers={[buttonStyle('bordered')]}
                   />
                 </>
