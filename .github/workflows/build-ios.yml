@@ -52,7 +52,7 @@ jobs:
 
       - name: Install locked dependencies and native patches
         # postinstall runs patch-package; --ignore-scripts would break the build.
-        run: npm ci --include=dev
+        run: npm ci
 
       - name: Check TypeScript
         # @expo/ui's SwiftUI component types are deeply nested. Increase only
