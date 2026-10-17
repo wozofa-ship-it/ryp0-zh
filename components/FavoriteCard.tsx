@@ -22,6 +22,62 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const rename = useFavoritesStore(s => s.rename);
   const shareIpa = useFavoritesStore(s => s.shareIpa);
 
+  const handleUpdate = useCallback(async () => {
+    // 检查更新：如果是从仓库收藏的，对比仓库最新版本
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (!app.bundleIdentifier || app.bundleIdentifier.startsWith('local.favorite.')) {
+      Alert.alert('更新', '该收藏无仓库信息，无法检查更新。');
+      return;
+    }
+    try {
+      // 从仓库获取最新版本
+      const { useRepoStore } = await import('../store/useRepoStore');
+      const repo = useRepoStore.getState().repo;
+      if (!repo) {
+        Alert.alert('更新', '仓库数据未加载，请先到"全部应用"页刷新。');
+        return;
+      }
+      const repoApp = repo.apps.find((a: any) => a.bundleIdentifier === app.bundleIdentifier);
+      if (!repoApp) {
+        Alert.alert('更新', '仓库中已无此应用。');
+        return;
+      }
+      const latestVersion = repoApp.versions?.[0]?.version || repoApp.version;
+      if (latestVersion && latestVersion !== app.version) {
+        Alert.alert(
+          '发现新版本',
+          `当前：${app.version || '未知'}\n最新：${latestVersion}\n是否更新？`,
+          [
+            { text: '取消', style: 'cancel' },
+            {
+              text: '更新',
+              onPress: async () => {
+                // 删除旧收藏，重新从仓库添加
+                const { useFavoritesStore } = await import('../services/favorites');
+                await useFavoritesStore.getState().remove(app.id);
+                const latest = repoApp.versions?.[0];
+                await useFavoritesStore.getState().addRepoApp({
+                  name: repoApp.name,
+                  bundleIdentifier: repoApp.bundleIdentifier,
+                  version: latest?.version || repoApp.version || '',
+                  downloadURL: latest?.downloadURL || '',
+                  size: latest?.size,
+                });
+                Alert.alert('已更新', `「${repoApp.name}」已更新到 ${latestVersion}。`);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('更新', '已是最新版本。');
+      }
+    } catch (e: any) {
+      Alert.alert('更新失败', e?.message || '检查更新时出错');
+    }
+  }, [app]);
+
   const handleOpenDetails = useCallback(async () => {
     // 点卡片：弹详情+安装选项（收藏是本地文件，走不到仓库详情页）
     try {
@@ -101,6 +157,9 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
           <Text style={styles.bundle} numberOfLines={1}>{app.bundleIdentifier}</Text>
         </View>
         <View style={styles.actions}>
+          <TouchableOpacity onPress={handleUpdate} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
+            <Text style={styles.smallText}>更新</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={[styles.btn, styles.smallBtn]} activeOpacity={0.8}>
             <Text style={styles.smallText}>分享</Text>
           </TouchableOpacity>
