@@ -99,7 +99,7 @@ interface FavoritesState {
   importFromUrl: (url: string, name?: string) => Promise<FavoriteApp | null>;
   importFromListFile: () => Promise<number>;
   exportToFile: () => Promise<string | null>;
-  addRepoApp: (app: { name: string; bundleIdentifier: string; version: string; downloadURL: string; size?: number }) => Promise<FavoriteApp | null>;
+  addRepoApp: (app: { name: string; bundleIdentifier: string; version: string; downloadURL: string; size?: number; iconURL?: string }) => Promise<FavoriteApp | null>;
   remove: (id: string) => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
   shareIpa: (id: string) => Promise<void>;
@@ -229,6 +229,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       size: downloaded.size ?? app.size ?? 0,
       importDate: new Date().toISOString(),
       sourceUrl: app.downloadURL,
+      iconUri: app.iconURL || undefined,
     };
     const list = [...get().favorites, fav];
     await persist(list);
