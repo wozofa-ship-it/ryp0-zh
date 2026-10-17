@@ -35,7 +35,7 @@ export default function TgViewer() {
         {loading ? '正在获取…' : '查看频道 IPA'}
       </Button>
       {result && !result.error && result.newIpas.length > 0 && (
-        <Text>找到 {result.newIpas.length} 个 IPA，点击下方按钮打开链接：</Text>
+        <Text>找到 {String(result.newIpas.length)} 个 IPA，点击下方按钮打开链接：</Text>
       )}
       {result && !result.error && result.newIpas.map((url, i) => (
         <Button key={i} onPress={() => Linking.openURL(url)}>
