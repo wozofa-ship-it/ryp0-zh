@@ -59,38 +59,6 @@ function extractVersion(filename: string): string {
   return m ? m[1] : '1.0';
 }
 
-async function extractIconFromIpa(ipaFile: File, dir: Directory, id: string): Promise<string | null> {
-  try {
-    const JSZip = (await import('jszip')).default;
-    const resp = await fetch(ipaFile.uri);
-    const buf = await resp.arrayBuffer();
-    const zip = await JSZip.loadAsync(buf);
-    const appDirName = Object.keys(zip.files).find(p =>
-      p.startsWith('Payload/') && p.endsWith('.app/') && p.split('/').length === 3
-    );
-    if (!appDirName) return null;
-    const iconNames = [
-      'AppIcon60x60@3x.png', 'AppIcon60x60@2x.png',
-      'AppIcon76x76@2x~ipad.png', 'AppIcon76x76~ipad.png',
-      'Icon-60@3x.png', 'Icon-60@2x.png', 'Icon-76@2x.png', 'Icon-76.png',
-      'Icon.png', 'icon.png',
-    ];
-    for (const iconName of iconNames) {
-      const path = `${appDirName}${iconName}`;
-      const entry = zip.files[path];
-      if (entry && !entry.dir) {
-        const blob = await entry.async('base64');
-        const iconFile = new File(dir, `${id}-icon.png`);
-        await iconFile.write(blob, { encoding: 'base64' } as any);
-        return iconFile.uri;
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 interface FavoritesState {
   favorites: FavoriteApp[];
   loaded: boolean;
@@ -147,7 +115,6 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       const dest = new File(dir, `${id}.ipa`);
       const src = new File(asset.uri);
       src.copy(dest);
-      const iconUri = await extractIconFromIpa(dest, dir, id);
       imported.push({
         id,
         name: cleanName(asset.name),
@@ -156,10 +123,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
         fileUri: dest.uri,
         size: asset.size ?? dest.size ?? 0,
         importDate: new Date().toISOString(),
-        ...(iconUri ? { iconUri } : {}),
-      });
-    }
-    if (!imported.length) throw new Error('所选文件中没有 .ipa');
+            if (!imported.length) throw new Error('所选文件中没有 .ipa');
     const list = [...get().favorites, ...imported];
     await persist(list);
     set({ favorites: list });
@@ -173,7 +137,6 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     const dest = new File(dir, `${id}.ipa`);
     const downloaded = await robustDownload(clean, dest);
     const filename = name || clean.split('/').pop()?.split('?')[0] || `${id}.ipa`;
-    const iconUri = await extractIconFromIpa(downloaded, dir, id);
     const fav: FavoriteApp = {
       id,
       name: cleanName(filename),
@@ -183,8 +146,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       size: downloaded.size ?? 0,
       importDate: new Date().toISOString(),
       sourceUrl: clean,
-      ...(iconUri ? { iconUri } : {}),
-    };
+      
     const list = [...get().favorites, fav];
     await persist(list);
     set({ favorites: list });
