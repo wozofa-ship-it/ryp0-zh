@@ -84,7 +84,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    router.push(`/(tabs)/(apps)/${app.bundleIdentifier}`);
+    router.push(`/favorite-details?id=${app.id}`);
   }, [app.id, router]);
 
   const handleShare = useCallback(async () => {
