@@ -86,7 +86,7 @@ export default function AppDetails({ app }: AppDetailsProps) {
       await store.addRepoApp({
         name: app.name,
         bundleIdentifier: app.bundleIdentifier,
-        version: latest?.version || app.version || '',
+        version: latest?.version || '',
         downloadURL: latest?.downloadURL || '',
         size: latest?.size,
       });
