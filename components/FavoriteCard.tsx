@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
-import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { FavoriteApp, useFavoritesStore } from '../services/favorites';
 
@@ -79,37 +80,12 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   }, [app]);
 
   const handleOpenDetails = useCallback(async () => {
-    // 点卡片：弹详情+安装选项（收藏是本地文件，走不到仓库详情页）
+    // 点卡片进收藏详情页（跟点仓库APP进详情页一样效果）
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    Alert.alert(
-      app.name,
-      `${app.version || ''}${app.size ? ` · ${formatSize(app.size)}` : ''}\n${app.bundleIdentifier || ''}`,
-      [
-        {
-          text: '安装',
-          onPress: async () => {
-            try {
-              if (app.sourceUrl && /^https?:\/\//i.test(app.sourceUrl)) {
-                const { Linking } = await import('react-native');
-                const isInstalled = await Linking.canOpenURL('livecontainer://install');
-                if (!isInstalled) throw new Error('未安装 LiveContainer，请先安装。');
-                await Linking.openURL(`livecontainer://install?url=${encodeURIComponent(app.sourceUrl)}`);
-                return;
-              }
-              const Sharing = await import('expo-sharing');
-              if (!(await Sharing.isAvailableAsync())) throw new Error('当前设备不支持分享');
-              await Sharing.shareAsync(app.fileUri, { dialogTitle: `用 LiveContainer 安装 ${app.name}` });
-            } catch (e: any) {
-              Alert.alert('安装失败', e?.message || '无法安装');
-            }
-          },
-        },
-        { text: '取消', style: 'cancel' },
-      ]
-    );
-  }, [app]);
+    router.push(`/(tabs)/(apps)/${app.bundleIdentifier}`);
+  }, [app.id, router]);
 
   const handleShare = useCallback(async () => {
     try {
