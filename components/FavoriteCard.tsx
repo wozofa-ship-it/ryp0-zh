@@ -25,7 +25,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   const handleInstall = useCallback(async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      Alert.alert('安装', `如何安装「${app.name}」?`, [
+      Alert.alert('安装', `如何安装「${app.name}」？`, [
         { text: '取消', style: 'cancel' },
         {
           text: '直接打开',
@@ -89,6 +89,7 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
     Alert.prompt('重命名', '输入新的应用名称', [
       { text: '取消', style: 'cancel' },
       {
+        text: '确定',
         onPress: (name?: string) => {
           const n = (name || '').trim();
           if (n) rename(app.id, n);
@@ -153,6 +154,7 @@ const styles = {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    alignItems: 'center' as const,
   },
   installBtn: { backgroundColor: '#0A84FF' },
   installText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' as const },
