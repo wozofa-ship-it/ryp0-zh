@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const toolbarThemeKey = colorScheme === 'dark' ? 'dark' : 'light';
 
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('favorites');
   const selectedCategoryRef = useRef(selectedCategory);
 
   // 我的收藏
