@@ -589,7 +589,7 @@ export default function HomeScreen() {
         <Animated.FlatList
           style={[styles.list, { backgroundColor: theme.background }]}
           data={filteredApps}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.bundleIdentifier}
           renderItem={renderPlainItem}
           ListHeaderComponent={categoryTabs}
           ListEmptyComponent={FavoritesEmpty}
