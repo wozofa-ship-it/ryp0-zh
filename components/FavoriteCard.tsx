@@ -81,12 +81,17 @@ export default function FavoriteCard({ app }: { app: FavoriteApp }) {
   }, [app]);
 
   const handleOpenDetails = useCallback(async () => {
-    // 点卡片进收藏详情页（跟点仓库APP进详情页一样效果）
+    // 点卡片进完整应用详情页 (跟点仓库APP详情页一样效果)
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    router.push(`/favorite-details?id=${app.id}`);
-  }, [app.id, router]);
+    // [bundleIdentifier] 详情路由同时覆盖两种情况：
+    // 有关联 repoApp 时展示完整仓库信息，只有本地 IPA 信息时构造兼容对象展示完整信息
+    router.push({
+      pathname: '/(tabs)/(apps)/[bundleIdentifier]',
+      params: { bundleIdentifier: app.bundleIdentifier },
+    });
+  }, [app.bundleIdentifier, router]);
 
   const handleShare = useCallback(async () => {
     try {
