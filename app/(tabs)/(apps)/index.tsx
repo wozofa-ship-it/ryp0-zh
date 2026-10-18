@@ -86,6 +86,7 @@ export default function HomeScreen() {
   const importFromUrl = useFavoritesStore(s => s.importFromUrl);
   const importFromListFile = useFavoritesStore(s => s.importFromListFile);
   const exportToFile = useFavoritesStore(s => s.exportToFile);
+  const clearFavorites = useFavoritesStore(s => s.clear);
   const removeFavorite = useFavoritesStore(s => s.remove);
   const addRepoApp = useFavoritesStore(s => s.addRepoApp);
   const [importing, setImporting] = useState(false);
@@ -324,6 +325,24 @@ export default function HomeScreen() {
     }
   }, [importing, exportToFile]);
 
+  const handleClearFavorites = useCallback(() => {
+    if (!favorites.length) return;
+    Alert.alert('删除全部', `确定要删除全部 ${favorites.length} 个收藏吗？本地 IPA 文件也会一并删除，该操作不可恢复。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await clearFavorites();
+          } catch (e: any) {
+            Alert.alert('删除失败', e?.message || '无法删除收藏。');
+          }
+        },
+      },
+    ]);
+  }, [clearFavorites, favorites.length]);
+
   const handleUpdateAll = useCallback(async () => {
     if (importing || !favorites.length) return;
     Alert.alert(
@@ -438,9 +457,17 @@ export default function HomeScreen() {
         >
           <Text style={[styles.importBtnText, styles.importBtnTextSecondary]}>更新全部</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={handleClearFavorites}
+          disabled={importing || !favorites.length}
+          style={[styles.importBtn, styles.clearBtn, (importing || !favorites.length) && styles.importBtnDisabled]}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.importBtnText, styles.clearBtnText]}>删除全部</Text>
+        </TouchableOpacity>
       </View>
     </View>
-  ), [accentColor, favorites.length, handleCategorySelect, handleExport, handleImportFile, handleImportListFile, handleImportUrl, handleUpdateAll, importing, selectedCategory, theme.secondaryLabel]);
+  ), [accentColor, favorites.length, handleCategorySelect, handleClearFavorites, handleExport, handleImportFile, handleImportListFile, handleImportUrl, handleUpdateAll, importing, selectedCategory, theme.secondaryLabel]);
 
   const FavoritesEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -561,19 +588,14 @@ export default function HomeScreen() {
       ) : (
         <Animated.FlatList
           style={[styles.list, { backgroundColor: theme.background }]}
-          data={filteredApps}
-          keyExtractor={(item: RepoApp) => item.bundleIdentifier}
-          getItemLayout={getAppItemLayout}
-          renderItem={renderPlainItem}
-          ListHeaderComponent={categoryTabs}
-          ListEmptyComponent={ListEmpty}
+          data={favorites}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <FavoriteCard app={item} />}
+          ListHeaderComponent={favoritesHeader}
+          ListEmptyComponent={FavoritesEmpty}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="automatic"
-          initialNumToRender={7}
-          maxToRenderPerBatch={7}
-          updateCellsBatchingPeriod={16}
-          windowSize={5}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
         />
@@ -635,6 +657,12 @@ const styles = StyleSheet.create({
   },
   importBtnTextSecondary: {
     color: '#0A84FF',
+  },
+  clearBtn: {
+    backgroundColor: '#2C2C2E',
+  },
+  clearBtnText: {
+    color: '#FF453A',
   },
   emptyContainer: {
     alignItems: 'center',
